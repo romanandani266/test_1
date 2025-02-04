@@ -1,0 +1,1 @@
+The Retail Inventory Management System is a backend service developed using FastAPI. It manages users, products, inventory, and sales, providing a RESTful API for these operations.
