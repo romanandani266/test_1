@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
-import { login } from '../../redux/actions/authActions';
+import { login } from '../../redux/slices/authSlice';
 import { TextField, Button } from '@mui/material';
 
 const Login = () => {
@@ -8,7 +8,7 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const dispatch = useDispatch();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     dispatch(login({ email, password }));
   };
@@ -17,7 +17,7 @@ const Login = () => {
     <form onSubmit={handleSubmit}>
       <TextField label="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
       <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
-      <Button type="submit" variant="contained" color="primary">Login</Button>
+      <Button type="submit">Login</Button>
     </form>
   );
 };
