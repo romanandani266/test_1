@@ -1,13 +1,12 @@
-import { createStore, applyMiddleware, combineReducers } from 'redux';
-import thunk from 'redux-thunk';
-import authReducer from './reducers/authReducer';
-import productReducer from './reducers/productReducer';
+import { configureStore } from '@reduxjs/toolkit';
+import authReducer from './slices/authSlice';
+import productReducer from './slices/productSlice';
+import salesReducer from './slices/salesSlice';
 
-const rootReducer = combineReducers({
-  auth: authReducer,
-  products: productReducer,
+export const store = configureStore({
+  reducer: {
+    auth: authReducer,
+    products: productReducer,
+    sales: salesReducer,
+  },
 });
-
-const store = createStore(rootReducer, applyMiddleware(thunk));
-
-export default store;
