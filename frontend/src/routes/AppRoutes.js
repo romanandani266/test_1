@@ -1,21 +1,20 @@
-import React from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import LoginPage from "../pages/LoginPage";
-import Dashboard from "../pages/Dashboard";
-import InventoryPage from "../pages/InventoryPage";
-import AlertsPage from "../pages/AlertsPage";
-import SalesTrendsPage from "../pages/SalesTrendsPage";
-import PrivateRoute from "./PrivateRoute";
+import React from 'react';
+import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
+import LoginPage from '../pages/LoginPage';
+import Dashboard from '../pages/Dashboard';
+import InventoryPage from '../pages/InventoryPage';
+import AlertsPage from '../pages/AlertsPage';
+import SalesPage from '../pages/SalesPage';
 
 const AppRoutes = () => {
   return (
     <Router>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-        <Route path="/inventory" element={<PrivateRoute><InventoryPage /></PrivateRoute>} />
-        <Route path="/alerts" element={<PrivateRoute><AlertsPage /></PrivateRoute>} />
-        <Route path="/sales-trends" element={<PrivateRoute><SalesTrendsPage /></PrivateRoute>} />
+        <Route path="/" element={<LoginPage />} />
+        <Route path="/dashboard" element={<Dashboard />} />
+        <Route path="/inventory" element={<InventoryPage />} />
+        <Route path="/alerts" element={<AlertsPage />} />
+        <Route path="/sales" element={<SalesPage />} />
       </Routes>
     </Router>
   );
