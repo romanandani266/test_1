@@ -1,14 +1,10 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Path, Query
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
-
-users = [{"user_id": 1, "username": "admin", "password_hash": "admin123", "role": "admin"}]
-inventory = []
-alerts = []
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
@@ -25,6 +21,7 @@ class User(BaseModel):
     password: str
 
 class InventoryItem(BaseModel):
+    inventory_id: int
     product_id: int
     product_name: str
     category: str
@@ -37,72 +34,75 @@ class Alert(BaseModel):
     threshold: int
     status: str
 
-class SalesTrendReport(BaseModel):
+class SalesTrend(BaseModel):
     product_id: int
     product_name: str
-    sales_trend: str
+    sales_data: List[int]
+
+mock_users = [{"username": "admin", "password": "password", "role": "admin"}]
+mock_inventory = []
+mock_alerts = []
+mock_sales_trends = []
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    if token == "valid_token":
+        return {"username": "test_user", "role": "admin"}
+    raise HTTPException(status_code=401, detail="Invalid token")
 
 @app.post("/api/auth/login")
-def login(user: User):
-    for u in users:
-        if u["username"] == user.username and u["password_hash"] == user.password:
-            return {"token": "fake-jwt-token", "role": u["role"]}
+async def login(user: User):
+    for mock_user in mock_users:
+        if user.username == mock_user["username"] and user.password == mock_user["password"]:
+            return {"token": "valid_token", "role": mock_user["role"]}
     raise HTTPException(status_code=401, detail="Invalid credentials")
 
 @app.post("/api/auth/logout")
-def logout(token: str = Depends(oauth2_scheme)):
-    return {"message": "Logged out successfully"}
+async def logout(token: str = Depends(oauth2_scheme)):
+    return {"message": "Logout successful"}
 
 @app.get("/api/inventory", response_model=List[InventoryItem])
-def get_inventory():
-    return inventory
+async def get_inventory(category: Optional[str] = Query(None)):
+    if category:
+        return [item for item in mock_inventory if item["category"] == category]
+    return mock_inventory
 
 @app.post("/api/inventory")
-def add_inventory_item(item: InventoryItem):
-    inventory.append(item.dict())
+async def add_inventory_item(item: InventoryItem):
+    mock_inventory.append(item.dict())
     return {"message": "Inventory item added successfully"}
 
 @app.put("/api/inventory/{id}")
-def update_inventory_item(id: int, item: InventoryItem):
-    for i, inv_item in enumerate(inventory):
-        if inv_item["product_id"] == id:
-            inventory[i] = item.dict()
+async def update_inventory_item(id: int, item: InventoryItem):
+    for i, inv_item in enumerate(mock_inventory):
+        if inv_item["inventory_id"] == id:
+            mock_inventory[i] = item.dict()
             return {"message": "Inventory item updated successfully"}
     raise HTTPException(status_code=404, detail="Inventory item not found")
 
 @app.delete("/api/inventory/{id}")
-def delete_inventory_item(id: int):
-    for i, inv_item in enumerate(inventory):
-        if inv_item["product_id"] == id:
-            inventory.pop(i)
-            return {"message": "Inventory item deleted successfully"}
-    raise HTTPException(status_code=404, detail="Inventory item not found")
+async def delete_inventory_item(id: int):
+    global mock_inventory
+    mock_inventory = [item for item in mock_inventory if item["inventory_id"] != id]
+    return {"message": "Inventory item deleted successfully"}
 
 @app.get("/api/alerts", response_model=List[Alert])
-def get_alerts():
-    return alerts
+async def get_alerts():
+    return mock_alerts
 
 @app.post("/api/alerts")
-def create_alert(alert: Alert):
-    alerts.append(alert.dict())
+async def create_alert(alert: Alert):
+    mock_alerts.append(alert.dict())
     return {"message": "Alert created successfully"}
 
 @app.delete("/api/alerts/{id}")
-def delete_alert(id: int):
-    for i, alert in enumerate(alerts):
-        if alert["alert_id"] == id:
-            alerts.pop(i)
-            return {"message": "Alert deleted successfully"}
-    raise HTTPException(status_code=404, detail="Alert not found")
+async def delete_alert(id: int):
+    global mock_alerts
+    mock_alerts = [alert for alert in mock_alerts if alert["alert_id"] != id]
+    return {"message": "Alert deleted successfully"}
 
-@app.get("/api/sales/trends", response_model=List[SalesTrendReport])
-def get_sales_trends():
-    sales_trends = [
-        {"product_id": 1, "product_name": "Product A", "sales_trend": "increasing"},
-        {"product_id": 2, "product_name": "Product B", "sales_trend": "decreasing"},
-        {"product_id": 3, "product_name": "Product C", "sales_trend": "stable"},
-    ]
-    return sales_trends
+@app.get("/api/sales/trends", response_model=List[SalesTrend])
+async def get_sales_trends():
+    return mock_sales_trends
 
 if __name__ == "__main__":
     import uvicorn
