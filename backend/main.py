@@ -1,3 +1,4 @@
+```python
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -19,7 +20,6 @@ app.add_middleware(
 )
 
 products = []
-users = {"admin": "password123"}
 
 class Product(BaseModel):
     id: int
@@ -35,10 +35,6 @@ class UpdateProduct(BaseModel):
     stock_level: Optional[int] = None
     restock_threshold: Optional[int] = None
     price: Optional[float] = None
-
-class LoginRequest(BaseModel):
-    username: str
-    password: str
 
 @app.get("/")
 def read_root():
@@ -92,11 +88,4 @@ def delete_product(product_id: int):
 def get_low_stock_products():
     low_stock_products = [product for product in products if product.stock_level <= product.restock_threshold]
     return low_stock_products
-
-@app.post("/login")
-def login(login_request: LoginRequest):
-    username = login_request.username
-    password = login_request.password
-    if username in users and users[username] == password:
-        return {"message": "Login successful"}
-    raise HTTPException(status_code=401, detail="Invalid username or password")
+```
