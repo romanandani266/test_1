@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -24,11 +24,26 @@ SECRET_KEY = "your_secret_key"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-mock_inventory = []
-mock_alerts = []
-mock_users = [{"username": "admin", "password": "admin123", "role": "admin"}]
+mock_users = {
+    "admin": {"username": "admin", "password": "admin123", "role": "admin"},
+    "user": {"username": "user", "password": "user123", "role": "user"},
+}
 
-class User(BaseModel):
+mock_inventory = [
+    {"inventory_id": 1, "product_id": 101, "quantity": 50},
+    {"inventory_id": 2, "product_id": 102, "quantity": 20},
+]
+
+mock_alerts = [
+    {"alert_id": 1, "product_id": 101, "threshold": 10, "status": "active"},
+]
+
+mock_sales_trends = [
+    {"product_id": 101, "trend": "increasing"},
+    {"product_id": 102, "trend": "stable"},
+]
+
+class LoginRequest(BaseModel):
     username: str
     password: str
 
@@ -38,45 +53,48 @@ class Token(BaseModel):
     role: str
 
 class InventoryItem(BaseModel):
-    id: int
-    product_name: str
-    category: str
-    price: float
+    inventory_id: int
+    product_id: int
     quantity: int
 
 class Alert(BaseModel):
-    id: int
+    alert_id: int
     product_id: int
     threshold: int
     status: str
 
+class SalesTrend(BaseModel):
+    product_id: int
+    trend: str
+
 def authenticate_user(username: str, password: str):
-    for user in mock_users:
-        if user["username"] == username and user["password"] == password:
-            return user
+    user = mock_users.get(username)
+    if user and user["password"] == password:
+        return user
     return None
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+def decode_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 @app.post("/api/auth/login", response_model=Token)
-def login(user: User):
-    authenticated_user = authenticate_user(user.username, user.password)
-    if not authenticated_user:
+def login(login_request: LoginRequest):
+    user = authenticate_user(login_request.username, login_request.password)
+    if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": authenticated_user["username"], "role": authenticated_user["role"]},
-        expires_delta=access_token_expires,
-    )
-    return {"access_token": access_token, "token_type": "bearer", "role": authenticated_user["role"]}
+    access_token = create_access_token(data={"sub": user["username"]})
+    return {"access_token": access_token, "token_type": "bearer", "role": user["role"]}
 
 @app.post("/api/auth/logout")
 def logout():
@@ -86,44 +104,40 @@ def logout():
 def get_inventory():
     return mock_inventory
 
-@app.post("/api/inventory", response_model=InventoryItem)
-def add_inventory_item(item: InventoryItem):
-    mock_inventory.append(item)
-    return item
+@app.post("/api/inventory")
+def add_inventory(item: InventoryItem):
+    mock_inventory.append(item.dict())
+    return {"message": "Inventory item added successfully"}
 
-@app.put("/api/inventory/{id}", response_model=InventoryItem)
-def update_inventory_item(id: int, item: InventoryItem):
-    for i, inv_item in enumerate(mock_inventory):
-        if inv_item.id == id:
-            mock_inventory[i] = item
-            return item
-    raise HTTPException(status_code=404, detail="Item not found")
+@app.put("/api/inventory/{id}")
+def update_inventory(id: int, item: InventoryItem):
+    for inv in mock_inventory:
+        if inv["inventory_id"] == id:
+            inv.update(item.dict())
+            return {"message": "Inventory item updated successfully"}
+    raise HTTPException(status_code=404, detail="Inventory item not found")
 
 @app.delete("/api/inventory/{id}")
-def delete_inventory_item(id: int):
-    for i, inv_item in enumerate(mock_inventory):
-        if inv_item.id == id:
-            del mock_inventory[i]
-            return {"message": "Item deleted successfully"}
-    raise HTTPException(status_code=404, detail="Item not found")
+def delete_inventory(id: int):
+    global mock_inventory
+    mock_inventory = [inv for inv in mock_inventory if inv["inventory_id"] != id]
+    return {"message": "Inventory item deleted successfully"}
 
 @app.get("/api/alerts", response_model=List[Alert])
 def get_alerts():
     return mock_alerts
 
-@app.post("/api/alerts", response_model=Alert)
+@app.post("/api/alerts")
 def create_alert(alert: Alert):
-    mock_alerts.append(alert)
-    return alert
+    mock_alerts.append(alert.dict())
+    return {"message": "Alert created successfully"}
 
 @app.delete("/api/alerts/{id}")
 def delete_alert(id: int):
-    for i, alert in enumerate(mock_alerts):
-        if alert.id == id:
-            del mock_alerts[i]
-            return {"message": "Alert deleted successfully"}
-    raise HTTPException(status_code=404, detail="Alert not found")
+    global mock_alerts
+    mock_alerts = [alert for alert in mock_alerts if alert["alert_id"] != id]
+    return {"message": "Alert deleted successfully"}
 
-@app.get("/api/sales/trends")
+@app.get("/api/sales/trends", response_model=List[SalesTrend])
 def get_sales_trends():
-    return {"message": "Sales trend analysis not implemented yet"}
+    return mock_sales_trends
