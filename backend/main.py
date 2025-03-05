@@ -2,8 +2,6 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import datetime, timedelta
-import jwt
 
 app = FastAPI()
 
@@ -20,122 +18,74 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-SECRET_KEY = "your_secret_key"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-mock_users = {
-    "admin": {"username": "admin", "password": "admin123", "role": "admin"},
-    "user": {"username": "user", "password": "user123", "role": "user"},
-}
-
-mock_inventory = [
-    {"inventory_id": 1, "product_id": 101, "quantity": 50},
-    {"inventory_id": 2, "product_id": 102, "quantity": 20},
-]
-
-mock_alerts = [
-    {"alert_id": 1, "product_id": 101, "threshold": 10, "status": "active"},
-]
-
-mock_sales_trends = [
-    {"product_id": 101, "trend": "increasing"},
-    {"product_id": 102, "trend": "stable"},
-]
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-    role: str
-
-class LoginRequest(BaseModel):
+class User(BaseModel):
     username: str
     password: str
 
-class InventoryItem(BaseModel):
-    inventory_id: int
-    product_id: int
-    quantity: int
+class LoginResponse(BaseModel):
+    message: str
+    token: Optional[str] = None
 
-class Alert(BaseModel):
-    alert_id: int
-    product_id: int
-    threshold: int
-    status: str
+class Item(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    price: float
 
-class SalesTrend(BaseModel):
-    product_id: int
-    trend: str
+class ItemUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[float] = None
 
-def authenticate_user(username: str, password: str):
-    user = mock_users.get(username)
-    if user and user["password"] == password:
-        return user
-    return None
+users = {"testuser": "testpassword"}
+items = [
+    {"id": 1, "name": "Item 1", "description": "Description 1", "price": 10.0},
+    {"id": 2, "name": "Item 2", "description": "Description 2", "price": 20.0},
+]
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+@app.post("/login", response_model=LoginResponse)
+def login(user: User):
+    if user.username in users and users[user.username] == user.password:
+        token = f"token-{user.username}"
+        return {"message": "Login successful", "token": token}
+    raise HTTPException(status_code=401, detail="Invalid username or password")
 
-@app.post("/api/auth/login", response_model=Token)
-def login(login_request: LoginRequest):
-    user = authenticate_user(login_request.username, login_request.password)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user["username"], "role": user["role"]}, expires_delta=access_token_expires
-    )
-    return {"access_token": access_token, "token_type": "bearer", "role": user["role"]}
+@app.get("/items", response_model=List[Item])
+def get_items():
+    return items
 
-@app.post("/api/auth/logout")
-def logout():
-    return {"message": "Logged out successfully"}
+@app.get("/items/{item_id}", response_model=Item)
+def get_item(item_id: int):
+    for item in items:
+        if item["id"] == item_id:
+            return item
+    raise HTTPException(status_code=404, detail="Item not found")
 
-@app.get("/api/inventory", response_model=List[InventoryItem])
-def get_inventory():
-    return mock_inventory
+@app.post("/items", response_model=Item)
+def create_item(item: Item):
+    for existing_item in items:
+        if existing_item["id"] == item.id:
+            raise HTTPException(status_code=400, detail="Item with this ID already exists")
+    items.append(item.dict())
+    return item
 
-@app.post("/api/inventory")
-def add_inventory(item: InventoryItem):
-    mock_inventory.append(item.dict())
-    return {"message": "Inventory item added successfully"}
+@app.put("/items/{item_id}", response_model=Item)
+def update_item(item_id: int, item_update: ItemUpdate):
+    for item in items:
+        if item["id"] == item_id:
+            if item_update.name is not None:
+                item["name"] = item_update.name
+            if item_update.description is not None:
+                item["description"] = item_update.description
+            if item_update.price is not None:
+                item["price"] = item_update.price
+            return item
+    raise HTTPException(status_code=404, detail="Item not found")
 
-@app.put("/api/inventory/{id}")
-def update_inventory(id: int, item: InventoryItem):
-    for inv in mock_inventory:
-        if inv["inventory_id"] == id:
-            inv.update(item.dict())
-            return {"message": "Inventory item updated successfully"}
-    raise HTTPException(status_code=404, detail="Inventory item not found")
-
-@app.delete("/api/inventory/{id}")
-def delete_inventory(id: int):
-    global mock_inventory
-    mock_inventory = [inv for inv in mock_inventory if inv["inventory_id"] != id]
-    return {"message": "Inventory item deleted successfully"}
-
-@app.get("/api/alerts", response_model=List[Alert])
-def get_alerts():
-    return mock_alerts
-
-@app.post("/api/alerts")
-def create_alert(alert: Alert):
-    mock_alerts.append(alert.dict())
-    return {"message": "Alert created successfully"}
-
-@app.delete("/api/alerts/{id}")
-def delete_alert(id: int):
-    global mock_alerts
-    mock_alerts = [alert for alert in mock_alerts if alert["alert_id"] != id]
-    return {"message": "Alert deleted successfully"}
-
-@app.get("/api/sales/trends", response_model=List[SalesTrend])
-def get_sales_trends():
-    return mock_sales_trends
+@app.delete("/items/{item_id}", response_model=dict)
+def delete_item(item_id: int):
+    for item in items:
+        if item["id"] == item_id:
+            items.remove(item)
+            return {"message": "Item deleted successfully"}
+    raise HTTPException(status_code=404, detail="Item not found")
