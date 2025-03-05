@@ -24,19 +24,26 @@ users = {"admin": "password123"}
 class Product(BaseModel):
     id: int
     name: str
-    description: Optional[str] = None
+    category: str
+    quantity: int
+    restock_threshold: int
     price: float
-    stock: int
 
 class UpdateProduct(BaseModel):
     name: Optional[str] = None
-    description: Optional[str] = None
+    category: Optional[str] = None
+    quantity: Optional[int] = None
+    restock_threshold: Optional[int] = None
     price: Optional[float] = None
-    stock: Optional[int] = None
 
 class LoginRequest(BaseModel):
     username: str
     password: str
+
+def authenticate_user(username: str, password: str):
+    if username in users and users[username] == password:
+        return True
+    return False
 
 @app.get("/")
 def read_root():
@@ -44,9 +51,7 @@ def read_root():
 
 @app.post("/login")
 def login(login_request: LoginRequest):
-    username = login_request.username
-    password = login_request.password
-    if username in users and users[username] == password:
+    if authenticate_user(login_request.username, login_request.password):
         return {"message": "Login successful"}
     raise HTTPException(status_code=401, detail="Invalid username or password")
 
@@ -70,17 +75,19 @@ def create_product(product: Product):
     return product
 
 @app.put("/products/{product_id}", response_model=Product)
-def update_product(product_id: int, updated_product: UpdateProduct):
+def update_product(product_id: int, product_update: UpdateProduct):
     for product in products:
         if product.id == product_id:
-            if updated_product.name is not None:
-                product.name = updated_product.name
-            if updated_product.description is not None:
-                product.description = updated_product.description
-            if updated_product.price is not None:
-                product.price = updated_product.price
-            if updated_product.stock is not None:
-                product.stock = updated_product.stock
+            if product_update.name is not None:
+                product.name = product_update.name
+            if product_update.category is not None:
+                product.category = product_update.category
+            if product_update.quantity is not None:
+                product.quantity = product_update.quantity
+            if product_update.restock_threshold is not None:
+                product.restock_threshold = product_update.restock_threshold
+            if product_update.price is not None:
+                product.price = product_update.price
             return product
     raise HTTPException(status_code=404, detail="Product not found")
 
@@ -92,17 +99,20 @@ def delete_product(product_id: int):
             return {"message": "Product deleted successfully"}
     raise HTTPException(status_code=404, detail="Product not found")
 
-@app.get("/products/{product_id}/stock", response_model=dict)
-def check_stock(product_id: int):
-    for product in products:
-        if product.id == product_id:
-            return {"product_id": product_id, "stock": product.stock}
-    raise HTTPException(status_code=404, detail="Product not found")
+@app.get("/products/low-stock", response_model=List[Product])
+def get_low_stock_products():
+    low_stock_products = [product for product in products if product.quantity <= product.restock_threshold]
+    return low_stock_products
 
-@app.post("/products/{product_id}/restock", response_model=dict)
-def restock_product(product_id: int, quantity: int):
+@app.get("/products/predict-restock/{product_id}", response_model=dict)
+def predict_restock(product_id: int):
     for product in products:
         if product.id == product_id:
-            product.stock += quantity
-            return {"message": "Product restocked successfully", "new_stock": product.stock}
+            suggested_restock_quantity = product.restock_threshold * 2
+            return {
+                "product_id": product.id,
+                "product_name": product.name,
+                "current_quantity": product.quantity,
+                "suggested_restock_quantity": suggested_restock_quantity
+            }
     raise HTTPException(status_code=404, detail="Product not found")
