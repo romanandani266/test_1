@@ -1,13 +1,13 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
-app = FastAPI()
+app = FastAPI(title="User Management API", description="Backend API for managing users and authentication", version="1.0.0")
 
 origins = [
     "http://localhost:3000",
-    "https://yourfrontend.com",
+    "https://yourfrontend.com"
 ]
 
 app.add_middleware(
@@ -15,100 +15,89 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 
-fake_users_db = {
-    "testuser": {
-        "username": "testuser",
-        "full_name": "Test User",
-        "email": "testuser@example.com",
-        "hashed_password": "fakehashedpassword",
-        "disabled": False,
-    }
-}
-
-items = [
-    {"id": 1, "name": "Item 1", "description": "Description of Item 1", "price": 10.0, "on_offer": False},
-    {"id": 2, "name": "Item 2", "description": "Description of Item 2", "price": 20.0, "on_offer": True},
-]
-
 class User(BaseModel):
-    username: str
-    full_name: str | None = None
-    email: str | None = None
-    disabled: bool | None = None
-
-class UserLogin(BaseModel):
-    username: str
-    password: str
-
-class Item(BaseModel):
     id: int
     name: str
-    description: str | None = None
-    price: float
-    on_offer: bool
+    email: str
+    is_active: bool
 
-def fake_hash_password(password: str):
-    return "fakehashed" + password
+class CreateUserRequest(BaseModel):
+    name: str
+    email: str
 
-def get_user(db, username: str):
-    if username in db:
-        user_dict = db[username]
-        return User(**user_dict)
+class UpdateUserRequest(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    is_active: Optional[bool] = None
 
-def authenticate_user(username: str, password: str):
-    user = get_user(fake_users_db, username)
-    if not user:
-        return None
-    hashed_password = fake_hash_password(password)
-    if hashed_password != fake_users_db[username]["hashed_password"]:
-        return None
-    return user
+class LoginRequest(BaseModel):
+    email: str
+    password: str
 
-@app.post("/login")
-async def login(user: UserLogin):
-    authenticated_user = authenticate_user(user.username, user.password)
-    if not authenticated_user:
-        raise HTTPException(status_code=401, detail="Invalid username or password")
-    return {"message": "Login successful", "user": authenticated_user}
+class LoginResponse(BaseModel):
+    message: str
+    token: Optional[str] = None
 
-@app.get("/users/me", response_model=User)
-async def read_users_me(username: str):
-    user = get_user(fake_users_db, username)
+users = [
+    User(id=1, name="John Doe", email="john.doe@example.com", is_active=True),
+    User(id=2, name="Jane Smith", email="jane.smith@example.com", is_active=False)
+]
+
+fake_tokens = {
+    "john.doe@example.com": "fake-token-john",
+    "jane.smith@example.com": "fake-token-jane"
+}
+
+@app.get("/users", response_model=List[User])
+def get_users():
+    return users
+
+@app.get("/users/{user_id}", response_model=User)
+def get_user(user_id: int):
+    user = next((user for user in users if user.id == user_id), None)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return user
 
-@app.get("/items", response_model=List[Item])
-async def get_items():
-    return items
+@app.post("/users", response_model=User, status_code=201)
+def create_user(user_request: CreateUserRequest):
+    new_user = User(
+        id=len(users) + 1,
+        name=user_request.name,
+        email=user_request.email,
+        is_active=True
+    )
+    users.append(new_user)
+    return new_user
 
-@app.get("/items/{item_id}", response_model=Item)
-async def get_item(item_id: int):
-    for item in items:
-        if item["id"] == item_id:
-            return item
-    raise HTTPException(status_code=404, detail="Item not found")
+@app.put("/users/{user_id}", response_model=User)
+def update_user(user_id: int, user_request: UpdateUserRequest):
+    user = next((user for user in users if user.id == user_id), None)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user_request.name is not None:
+        user.name = user_request.name
+    if user_request.email is not None:
+        user.email = user_request.email
+    if user_request.is_active is not None:
+        user.is_active = user_request.is_active
+    return user
 
-@app.post("/items", response_model=Item)
-async def create_item(item: Item):
-    items.append(item.dict())
-    return item
+@app.delete("/users/{user_id}", status_code=204)
+def delete_user(user_id: int):
+    global users
+    users = [user for user in users if user.id != user_id]
+    return {"message": "User deleted successfully"}
 
-@app.put("/items/{item_id}", response_model=Item)
-async def update_item(item_id: int, updated_item: Item):
-    for index, item in enumerate(items):
-        if item["id"] == item_id:
-            items[index] = updated_item.dict()
-            return updated_item
-    raise HTTPException(status_code=404, detail="Item not found")
+@app.post("/login", response_model=LoginResponse)
+def login(login_request: LoginRequest):
+    if login_request.email in fake_tokens and login_request.password == "password":
+        return LoginResponse(message="Login successful", token=fake_tokens[login_request.email])
+    raise HTTPException(status_code=401, detail="Invalid email or password")
 
-@app.delete("/items/{item_id}")
-async def delete_item(item_id: int):
-    for index, item in enumerate(items):
-        if item["id"] == item_id:
-            del items[index]
-            return {"message": "Item deleted successfully"}
-    raise HTTPException(status_code=404, detail="Item not found")
+@app.get("/health", status_code=200)
+def health_check():
+    return {"status": "ok"}
