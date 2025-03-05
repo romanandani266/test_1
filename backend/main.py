@@ -1,78 +1,100 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
 
 app = FastAPI()
 
-origins = [
-    "http://localhost:3000",
-    "https://yourfrontend.com",
-]
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+mock_users = {
+    "admin": {"username": "admin", "password": "admin123", "role": "admin"},
+    "user": {"username": "user", "password": "user123", "role": "user"},
+}
 
-class User(BaseModel):
+class LoginRequest(BaseModel):
     username: str
     password: str
 
-class Item(BaseModel):
-    id: int
-    name: str
-    description: Optional[str] = None
+class InventoryItem(BaseModel):
+    inventory_id: int
+    product_id: int
+    product_name: str
+    category: str
     price: float
-    is_available: bool
+    quantity: int
 
-users = {"admin": "password123"}
-items = []
+class Alert(BaseModel):
+    alert_id: int
+    product_id: int
+    threshold: int
+    status: str
 
-@app.get("/")
-def read_root():
-    return {"message": "Welcome to the FastAPI backend!"}
+class SalesTrendReport(BaseModel):
+    product_id: int
+    product_name: str
+    sales_trend: str
 
-@app.post("/login")
-def login(user: User):
-    if user.username in users and users[user.username] == user.password:
-        return {"message": "Login successful", "username": user.username}
-    raise HTTPException(status_code=401, detail="Invalid username or password")
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    if token not in mock_users:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    return mock_users[token]
 
-@app.get("/items", response_model=List[Item])
-def get_items():
-    return items
+def get_admin_user(current_user: dict = Depends(get_current_user)):
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+    return current_user
 
-@app.get("/items/{item_id}", response_model=Item)
-def get_item(item_id: int):
-    for item in items:
-        if item.id == item_id:
-            return item
-    raise HTTPException(status_code=404, detail="Item not found")
+@app.post("/api/auth/login")
+def login(request: LoginRequest):
+    for user, details in mock_users.items():
+        if request.username == details["username"] and request.password == details["password"]:
+            return {"token": user, "role": details["role"]}
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
 
-@app.post("/items", response_model=Item)
-def create_item(item: Item):
-    for existing_item in items:
-        if existing_item.id == item.id:
-            raise HTTPException(status_code=400, detail="Item with this ID already exists")
-    items.append(item)
-    return item
+@app.post("/api/auth/logout")
+def logout(token: str = Depends(oauth2_scheme)):
+    if token not in mock_users:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    return {"message": "Logout successful"}
 
-@app.put("/items/{item_id}", response_model=Item)
-def update_item(item_id: int, updated_item: Item):
-    for index, item in enumerate(items):
-        if item.id == item_id:
-            items[index] = updated_item
-            return updated_item
-    raise HTTPException(status_code=404, detail="Item not found")
+@app.get("/api/inventory", response_model=List[InventoryItem])
+def get_inventory():
+    return [
+        {"inventory_id": 1, "product_id": 1, "product_name": "Product A", "category": "Category 1", "price": 10.0, "quantity": 100},
+        {"inventory_id": 2, "product_id": 2, "product_name": "Product B", "category": "Category 2", "price": 20.0, "quantity": 50},
+    ]
 
-@app.delete("/items/{item_id}")
-def delete_item(item_id: int):
-    for index, item in enumerate(items):
-        if item.id == item_id:
-            del items[index]
-            return {"message": "Item deleted successfully"}
-    raise HTTPException(status_code=404, detail="Item not found")
+@app.post("/api/inventory")
+def add_inventory(item: InventoryItem, current_user: dict = Depends(get_admin_user)):
+    return {"message": "Inventory item added successfully", "item": item}
+
+@app.put("/api/inventory/{id}")
+def update_inventory(id: int, item: InventoryItem, current_user: dict = Depends(get_admin_user)):
+    return {"message": f"Inventory item {id} updated successfully", "item": item}
+
+@app.delete("/api/inventory/{id}")
+def delete_inventory(id: int, current_user: dict = Depends(get_admin_user)):
+    return {"message": f"Inventory item {id} deleted successfully"}
+
+@app.get("/api/alerts", response_model=List[Alert])
+def get_alerts():
+    return [
+        {"alert_id": 1, "product_id": 1, "threshold": 20, "status": "active"},
+        {"alert_id": 2, "product_id": 2, "threshold": 10, "status": "inactive"},
+    ]
+
+@app.post("/api/alerts")
+def create_alert(alert: Alert, current_user: dict = Depends(get_admin_user)):
+    return {"message": "Alert created successfully", "alert": alert}
+
+@app.delete("/api/alerts/{id}")
+def delete_alert(id: int, current_user: dict = Depends(get_admin_user)):
+    return {"message": f"Alert {id} deleted successfully"}
+
+@app.get("/api/sales/trends", response_model=List[SalesTrendReport])
+def get_sales_trends():
+    return [
+        {"product_id": 1, "product_name": "Product A", "sales_trend": "Increasing"},
+        {"product_id": 2, "product_name": "Product B", "sales_trend": "Decreasing"},
+    ]
