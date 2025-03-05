@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from typing import List, Optional
 
 app = FastAPI()
 
@@ -24,66 +25,54 @@ class User(BaseModel):
 class Item(BaseModel):
     id: int
     name: str
-    description: str
+    description: Optional[str] = None
     price: float
     available: bool
 
-class UpdateItem(BaseModel):
-    name: str = None
-    description: str = None
-    price: float = None
-    available: bool = None
-
 users = {"admin": "password123"}
-items = [
-    {"id": 1, "name": "Item 1", "description": "Description 1", "price": 10.0, "available": True},
-    {"id": 2, "name": "Item 2", "description": "Description 2", "price": 20.0, "available": False},
-]
+items = []
+
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to the FastAPI backend!"}
 
 @app.post("/login")
 def login(user: User):
     if user.username in users and users[user.username] == user.password:
-        return {"message": "Login successful"}
+        return {"message": "Login successful", "username": user.username}
     raise HTTPException(status_code=401, detail="Invalid username or password")
 
-@app.get("/items")
+@app.get("/items", response_model=List[Item])
 def get_items():
-    return {"items": items}
+    return items
 
-@app.get("/items/{item_id}")
+@app.get("/items/{item_id}", response_model=Item)
 def get_item(item_id: int):
     for item in items:
-        if item["id"] == item_id:
+        if item.id == item_id:
             return item
     raise HTTPException(status_code=404, detail="Item not found")
 
-@app.post("/items")
+@app.post("/items", response_model=Item)
 def create_item(item: Item):
     for existing_item in items:
-        if existing_item["id"] == item.id:
+        if existing_item.id == item.id:
             raise HTTPException(status_code=400, detail="Item with this ID already exists")
-    items.append(item.dict())
-    return {"message": "Item created successfully", "item": item}
+    items.append(item)
+    return item
 
-@app.put("/items/{item_id}")
-def update_item(item_id: int, item: UpdateItem):
-    for existing_item in items:
-        if existing_item["id"] == item_id:
-            if item.name is not None:
-                existing_item["name"] = item.name
-            if item.description is not None:
-                existing_item["description"] = item.description
-            if item.price is not None:
-                existing_item["price"] = item.price
-            if item.available is not None:
-                existing_item["available"] = item.available
-            return {"message": "Item updated successfully", "item": existing_item}
+@app.put("/items/{item_id}", response_model=Item)
+def update_item(item_id: int, updated_item: Item):
+    for index, item in enumerate(items):
+        if item.id == item_id:
+            items[index] = updated_item
+            return updated_item
     raise HTTPException(status_code=404, detail="Item not found")
 
 @app.delete("/items/{item_id}")
 def delete_item(item_id: int):
     for index, item in enumerate(items):
-        if item["id"] == item_id:
-            deleted_item = items.pop(index)
-            return {"message": "Item deleted successfully", "item": deleted_item}
+        if item.id == item_id:
+            del items[index]
+            return {"message": "Item deleted successfully"}
     raise HTTPException(status_code=404, detail="Item not found")
