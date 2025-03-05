@@ -19,7 +19,7 @@ app.add_middleware(
 )
 
 products = []
-users = {"admin": "password123"}
+users = [{"username": "admin", "password": "admin123"}]
 
 class Product(BaseModel):
     id: int
@@ -40,20 +40,13 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
-def authenticate_user(username: str, password: str):
-    if username in users and users[username] == password:
-        return True
-    return False
+class LoginResponse(BaseModel):
+    message: str
+    token: Optional[str] = None
 
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the Retail Inventory Management System API"}
-
-@app.post("/login")
-def login(login_request: LoginRequest):
-    if authenticate_user(login_request.username, login_request.password):
-        return {"message": "Login successful"}
-    raise HTTPException(status_code=401, detail="Invalid username or password")
 
 @app.get("/products", response_model=List[Product])
 def get_all_products():
@@ -99,20 +92,14 @@ def delete_product(product_id: int):
             return {"message": "Product deleted successfully"}
     raise HTTPException(status_code=404, detail="Product not found")
 
-@app.get("/products/low-stock", response_model=List[Product])
-def get_low_stock_products():
-    low_stock_products = [product for product in products if product.quantity <= product.restock_threshold]
-    return low_stock_products
+@app.get("/products/restock", response_model=List[Product])
+def get_products_to_restock():
+    restock_list = [product for product in products if product.quantity <= product.restock_threshold]
+    return restock_list
 
-@app.get("/products/predict-restock/{product_id}", response_model=dict)
-def predict_restock(product_id: int):
-    for product in products:
-        if product.id == product_id:
-            suggested_restock_quantity = product.restock_threshold * 2
-            return {
-                "product_id": product.id,
-                "product_name": product.name,
-                "current_quantity": product.quantity,
-                "suggested_restock_quantity": suggested_restock_quantity
-            }
-    raise HTTPException(status_code=404, detail="Product not found")
+@app.post("/login", response_model=LoginResponse)
+def login(login_request: LoginRequest):
+    for user in users:
+        if user["username"] == login_request.username and user["password"] == login_request.password:
+            return {"message": "Login successful", "token": "dummy_token"}
+    raise HTTPException(status_code=401, detail="Invalid username or password")
