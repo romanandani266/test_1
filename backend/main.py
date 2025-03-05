@@ -19,6 +19,7 @@ app.add_middleware(
 )
 
 products = []
+users = {"admin": "password123"}
 
 class Product(BaseModel):
     id: int
@@ -34,6 +35,14 @@ class UpdateProduct(BaseModel):
     stock_level: Optional[int] = None
     restock_threshold: Optional[int] = None
     price: Optional[float] = None
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+class LoginResponse(BaseModel):
+    message: str
+    token: Optional[str] = None
 
 @app.get("/")
 def read_root():
@@ -59,19 +68,19 @@ def create_product(product: Product):
     return product
 
 @app.put("/products/{product_id}", response_model=Product)
-def update_product(product_id: int, product_update: UpdateProduct):
+def update_product(product_id: int, updated_product: UpdateProduct):
     for product in products:
         if product.id == product_id:
-            if product_update.name is not None:
-                product.name = product_update.name
-            if product_update.category is not None:
-                product.category = product_update.category
-            if product_update.stock_level is not None:
-                product.stock_level = product_update.stock_level
-            if product_update.restock_threshold is not None:
-                product.restock_threshold = product_update.restock_threshold
-            if product_update.price is not None:
-                product.price = product_update.price
+            if updated_product.name is not None:
+                product.name = updated_product.name
+            if updated_product.category is not None:
+                product.category = updated_product.category
+            if updated_product.stock_level is not None:
+                product.stock_level = updated_product.stock_level
+            if updated_product.restock_threshold is not None:
+                product.restock_threshold = updated_product.restock_threshold
+            if updated_product.price is not None:
+                product.price = updated_product.price
             return product
     raise HTTPException(status_code=404, detail="Product not found")
 
@@ -87,3 +96,11 @@ def delete_product(product_id: int):
 def get_low_stock_products():
     low_stock_products = [product for product in products if product.stock_level <= product.restock_threshold]
     return low_stock_products
+
+@app.post("/login", response_model=LoginResponse)
+def login(login_request: LoginRequest):
+    username = login_request.username
+    password = login_request.password
+    if username in users and users[username] == password:
+        return {"message": "Login successful", "token": "dummy_token"}
+    raise HTTPException(status_code=401, detail="Invalid username or password")
