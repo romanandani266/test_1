@@ -19,7 +19,7 @@ app.add_middleware(
 )
 
 products = []
-users = [{"username": "admin", "password": "admin123"}]
+users = {"admin": "password123"}
 
 class Product(BaseModel):
     id: int
@@ -92,14 +92,15 @@ def delete_product(product_id: int):
             return {"message": "Product deleted successfully"}
     raise HTTPException(status_code=404, detail="Product not found")
 
-@app.get("/products/restock", response_model=List[Product])
-def get_products_to_restock():
-    restock_list = [product for product in products if product.quantity <= product.restock_threshold]
-    return restock_list
+@app.get("/products/low-stock", response_model=List[Product])
+def get_low_stock_products():
+    low_stock_products = [product for product in products if product.quantity <= product.restock_threshold]
+    return low_stock_products
 
 @app.post("/login", response_model=LoginResponse)
 def login(login_request: LoginRequest):
-    for user in users:
-        if user["username"] == login_request.username and user["password"] == login_request.password:
-            return {"message": "Login successful", "token": "dummy_token"}
+    username = login_request.username
+    password = login_request.password
+    if username in users and users[username] == password:
+        return {"message": "Login successful", "token": "dummy_token"}
     raise HTTPException(status_code=401, detail="Invalid username or password")
