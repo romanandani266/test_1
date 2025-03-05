@@ -22,31 +22,28 @@ class User(BaseModel):
     username: str
     password: str
 
-class LoginResponse(BaseModel):
-    message: str
-    token: Optional[str] = None
-
 class Item(BaseModel):
     id: int
     name: str
     description: Optional[str] = None
     price: float
+    available: bool
 
-class ItemUpdate(BaseModel):
-    name: Optional[str] = None
-    description: Optional[str] = None
-    price: Optional[float] = None
+class LoginResponse(BaseModel):
+    message: str
+    token: Optional[str] = None
 
-users = {"testuser": "testpassword"}
-items = [
-    {"id": 1, "name": "Item 1", "description": "Description 1", "price": 10.0},
-    {"id": 2, "name": "Item 2", "description": "Description 2", "price": 20.0},
-]
+users = {"admin": "password123"}
+items = []
+
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to the FastAPI backend!"}
 
 @app.post("/login", response_model=LoginResponse)
 def login(user: User):
     if user.username in users and users[user.username] == user.password:
-        token = f"token-{user.username}"
+        token = f"mock-token-for-{user.username}"
         return {"message": "Login successful", "token": token}
     raise HTTPException(status_code=401, detail="Invalid username or password")
 
@@ -57,35 +54,30 @@ def get_items():
 @app.get("/items/{item_id}", response_model=Item)
 def get_item(item_id: int):
     for item in items:
-        if item["id"] == item_id:
+        if item.id == item_id:
             return item
     raise HTTPException(status_code=404, detail="Item not found")
 
 @app.post("/items", response_model=Item)
 def create_item(item: Item):
     for existing_item in items:
-        if existing_item["id"] == item.id:
+        if existing_item.id == item.id:
             raise HTTPException(status_code=400, detail="Item with this ID already exists")
-    items.append(item.dict())
+    items.append(item)
     return item
 
 @app.put("/items/{item_id}", response_model=Item)
-def update_item(item_id: int, item_update: ItemUpdate):
-    for item in items:
-        if item["id"] == item_id:
-            if item_update.name is not None:
-                item["name"] = item_update.name
-            if item_update.description is not None:
-                item["description"] = item_update.description
-            if item_update.price is not None:
-                item["price"] = item_update.price
-            return item
+def update_item(item_id: int, updated_item: Item):
+    for index, item in enumerate(items):
+        if item.id == item_id:
+            items[index] = updated_item
+            return updated_item
     raise HTTPException(status_code=404, detail="Item not found")
 
-@app.delete("/items/{item_id}", response_model=dict)
+@app.delete("/items/{item_id}")
 def delete_item(item_id: int):
-    for item in items:
-        if item["id"] == item_id:
-            items.remove(item)
+    for index, item in enumerate(items):
+        if item.id == item_id:
+            del items[index]
             return {"message": "Item deleted successfully"}
     raise HTTPException(status_code=404, detail="Item not found")
