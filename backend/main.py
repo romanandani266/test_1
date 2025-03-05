@@ -1,9 +1,7 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
-from datetime import datetime, timedelta
-import jwt
 
 app = FastAPI()
 
@@ -20,124 +18,91 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-SECRET_KEY = "your_secret_key"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+products = []
+users = {"admin": "password123"}
 
-mock_users = {
-    "admin": {"username": "admin", "password": "admin123", "role": "admin"},
-    "user": {"username": "user", "password": "user123", "role": "user"},
-}
+class Product(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    price: float
+    stock: int
 
-mock_inventory = [
-    {"inventory_id": 1, "product_id": 101, "quantity": 50},
-    {"inventory_id": 2, "product_id": 102, "quantity": 20},
-]
-
-mock_alerts = [
-    {"alert_id": 1, "product_id": 101, "threshold": 10, "status": "active"},
-]
-
-mock_sales_trends = [
-    {"product_id": 101, "trend": "increasing"},
-    {"product_id": 102, "trend": "stable"},
-]
+class UpdateProduct(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    price: Optional[float] = None
+    stock: Optional[int] = None
 
 class LoginRequest(BaseModel):
     username: str
     password: str
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-    role: str
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to the Retail Inventory Management System API"}
 
-class InventoryItem(BaseModel):
-    inventory_id: int
-    product_id: int
-    quantity: int
-
-class Alert(BaseModel):
-    alert_id: int
-    product_id: int
-    threshold: int
-    status: str
-
-class SalesTrend(BaseModel):
-    product_id: int
-    trend: str
-
-def authenticate_user(username: str, password: str):
-    user = mock_users.get(username)
-    if user and user["password"] == password:
-        return user
-    return None
-
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    to_encode.update({"exp": expire})
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-
-def decode_token(token: str):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        return payload
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token has expired")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-@app.post("/api/auth/login", response_model=Token)
+@app.post("/login")
 def login(login_request: LoginRequest):
-    user = authenticate_user(login_request.username, login_request.password)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    access_token = create_access_token(data={"sub": user["username"]})
-    return {"access_token": access_token, "token_type": "bearer", "role": user["role"]}
+    username = login_request.username
+    password = login_request.password
+    if username in users and users[username] == password:
+        return {"message": "Login successful"}
+    raise HTTPException(status_code=401, detail="Invalid username or password")
 
-@app.post("/api/auth/logout")
-def logout():
-    return {"message": "Logged out successfully"}
+@app.get("/products", response_model=List[Product])
+def get_all_products():
+    return products
 
-@app.get("/api/inventory", response_model=List[InventoryItem])
-def get_inventory():
-    return mock_inventory
+@app.get("/products/{product_id}", response_model=Product)
+def get_product(product_id: int):
+    for product in products:
+        if product.id == product_id:
+            return product
+    raise HTTPException(status_code=404, detail="Product not found")
 
-@app.post("/api/inventory")
-def add_inventory(item: InventoryItem):
-    mock_inventory.append(item.dict())
-    return {"message": "Inventory item added successfully"}
+@app.post("/products", response_model=Product)
+def create_product(product: Product):
+    for existing_product in products:
+        if existing_product.id == product.id:
+            raise HTTPException(status_code=400, detail="Product with this ID already exists")
+    products.append(product)
+    return product
 
-@app.put("/api/inventory/{id}")
-def update_inventory(id: int, item: InventoryItem):
-    for inv in mock_inventory:
-        if inv["inventory_id"] == id:
-            inv.update(item.dict())
-            return {"message": "Inventory item updated successfully"}
-    raise HTTPException(status_code=404, detail="Inventory item not found")
+@app.put("/products/{product_id}", response_model=Product)
+def update_product(product_id: int, updated_product: UpdateProduct):
+    for product in products:
+        if product.id == product_id:
+            if updated_product.name is not None:
+                product.name = updated_product.name
+            if updated_product.description is not None:
+                product.description = updated_product.description
+            if updated_product.price is not None:
+                product.price = updated_product.price
+            if updated_product.stock is not None:
+                product.stock = updated_product.stock
+            return product
+    raise HTTPException(status_code=404, detail="Product not found")
 
-@app.delete("/api/inventory/{id}")
-def delete_inventory(id: int):
-    global mock_inventory
-    mock_inventory = [inv for inv in mock_inventory if inv["inventory_id"] != id]
-    return {"message": "Inventory item deleted successfully"}
+@app.delete("/products/{product_id}", response_model=dict)
+def delete_product(product_id: int):
+    for product in products:
+        if product.id == product_id:
+            products.remove(product)
+            return {"message": "Product deleted successfully"}
+    raise HTTPException(status_code=404, detail="Product not found")
 
-@app.get("/api/alerts", response_model=List[Alert])
-def get_alerts():
-    return mock_alerts
+@app.get("/products/{product_id}/stock", response_model=dict)
+def check_stock(product_id: int):
+    for product in products:
+        if product.id == product_id:
+            return {"product_id": product_id, "stock": product.stock}
+    raise HTTPException(status_code=404, detail="Product not found")
 
-@app.post("/api/alerts")
-def create_alert(alert: Alert):
-    mock_alerts.append(alert.dict())
-    return {"message": "Alert created successfully"}
-
-@app.delete("/api/alerts/{id}")
-def delete_alert(id: int):
-    global mock_alerts
-    mock_alerts = [alert for alert in mock_alerts if alert["alert_id"] != id]
-    return {"message": "Alert deleted successfully"}
-
-@app.get("/api/sales/trends", response_model=List[SalesTrend])
-def get_sales_trends():
-    return mock_sales_trends
+@app.post("/products/{product_id}/restock", response_model=dict)
+def restock_product(product_id: int, quantity: int):
+    for product in products:
+        if product.id == product_id:
+            product.stock += quantity
+            return {"message": "Product restocked successfully", "new_stock": product.stock}
+    raise HTTPException(status_code=404, detail="Product not found")
