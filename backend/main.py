@@ -27,7 +27,7 @@ class Item(BaseModel):
     name: str
     description: Optional[str] = None
     price: float
-    available: bool
+    is_available: bool
 
 users = {"admin": "password123"}
 items = []
