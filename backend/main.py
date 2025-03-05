@@ -25,24 +25,20 @@ class Product(BaseModel):
     id: int
     name: str
     category: str
-    quantity: int
+    stock_level: int
     restock_threshold: int
     price: float
 
 class UpdateProduct(BaseModel):
     name: Optional[str] = None
     category: Optional[str] = None
-    quantity: Optional[int] = None
+    stock_level: Optional[int] = None
     restock_threshold: Optional[int] = None
     price: Optional[float] = None
 
 class LoginRequest(BaseModel):
     username: str
     password: str
-
-class LoginResponse(BaseModel):
-    message: str
-    token: Optional[str] = None
 
 @app.get("/")
 def read_root():
@@ -75,8 +71,8 @@ def update_product(product_id: int, product_update: UpdateProduct):
                 product.name = product_update.name
             if product_update.category is not None:
                 product.category = product_update.category
-            if product_update.quantity is not None:
-                product.quantity = product_update.quantity
+            if product_update.stock_level is not None:
+                product.stock_level = product_update.stock_level
             if product_update.restock_threshold is not None:
                 product.restock_threshold = product_update.restock_threshold
             if product_update.price is not None:
@@ -92,16 +88,15 @@ def delete_product(product_id: int):
             return {"message": "Product deleted successfully"}
     raise HTTPException(status_code=404, detail="Product not found")
 
-@app.get("/products/restock", response_model=List[Product])
-def get_products_to_restock():
-    restock_list = [product for product in products if product.quantity <= product.restock_threshold]
-    return restock_list
+@app.get("/products/low-stock", response_model=List[Product])
+def get_low_stock_products():
+    low_stock_products = [product for product in products if product.stock_level <= product.restock_threshold]
+    return low_stock_products
 
-@app.post("/login", response_model=LoginResponse)
+@app.post("/login")
 def login(login_request: LoginRequest):
     username = login_request.username
     password = login_request.password
-
     if username in users and users[username] == password:
-        return {"message": "Login successful", "token": "dummy_token"}
+        return {"message": "Login successful"}
     raise HTTPException(status_code=401, detail="Invalid username or password")
