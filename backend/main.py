@@ -1,4 +1,3 @@
-```python
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -88,4 +87,3 @@ def delete_product(product_id: int):
 def get_low_stock_products():
     low_stock_products = [product for product in products if product.stock_level <= product.restock_threshold]
     return low_stock_products
-```
