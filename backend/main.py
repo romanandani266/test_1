@@ -44,10 +44,6 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     username: Optional[str] = None
 
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
@@ -70,14 +66,6 @@ def get_user(username: str):
         return UserInDB(**user)
     return None
 
-def authenticate_user(username: str, password: str):
-    user = get_user(username)
-    if not user:
-        return False
-    if not verify_password(password, user.hashed_password):
-        return False
-    return user
-
 @app.post("/register", response_model=User)
 async def register_user(user: User):
     if user.username in users_db:
@@ -89,20 +77,6 @@ async def register_user(user: User):
         "hashed_password": hashed_password,
     }
     return user
-
-@app.post("/login", response_model=Token)
-async def login_for_access_token(login_request: LoginRequest):
-    user = authenticate_user(login_request.username, login_request.password)
-    if not user:
-        raise HTTPException(
-            status_code=401,
-            detail="Incorrect username or password",
-        )
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
 
 @app.get("/me", response_model=User)
 async def read_users_me(token: str):
