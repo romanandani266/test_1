@@ -1,3 +1,4 @@
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -98,17 +99,17 @@ def logout():
 def get_inventory():
     return mock_inventory
 
-@app.post("/api/inventory")
+@app.post("/api/inventory", response_model=InventoryItem)
 def add_inventory(item: InventoryItem):
     mock_inventory.append(item.dict())
-    return {"message": "Inventory item added successfully"}
+    return item
 
-@app.put("/api/inventory/{id}")
+@app.put("/api/inventory/{id}", response_model=InventoryItem)
 def update_inventory(id: int, item: InventoryItem):
     for inv in mock_inventory:
         if inv["inventory_id"] == id:
             inv.update(item.dict())
-            return {"message": "Inventory item updated successfully"}
+            return item
     raise HTTPException(status_code=404, detail="Inventory item not found")
 
 @app.delete("/api/inventory/{id}")
@@ -121,10 +122,10 @@ def delete_inventory(id: int):
 def get_alerts():
     return mock_alerts
 
-@app.post("/api/alerts")
+@app.post("/api/alerts", response_model=Alert)
 def create_alert(alert: Alert):
     mock_alerts.append(alert.dict())
-    return {"message": "Alert created successfully"}
+    return alert
 
 @app.delete("/api/alerts/{id}")
 def delete_alert(id: int):
