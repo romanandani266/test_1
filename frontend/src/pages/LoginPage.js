@@ -1,12 +1,16 @@
-import React from 'react';
-import Login from '../components/Auth/Login';
+import React, { createContext, useState } from 'react';
 
-const LoginPage = () => {
+export const AuthContext = createContext();
+
+export const AuthProvider = ({ children }) => {
+  const [auth, setAuth] = useState(null);
+
+  const login = (data) => setAuth(data);
+  const logout = () => setAuth(null);
+
   return (
-    <div>
-      <Login />
-    </div>
+    <AuthContext.Provider value={{ auth, login, logout }}>
+      {children}
+    </AuthContext.Provider>
   );
 };
-
-export default LoginPage;
