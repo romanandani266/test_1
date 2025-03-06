@@ -1,97 +1,113 @@
-from fastapi import FastAPI, HTTPException, Depends
-from fastapi.security import OAuth2PasswordBearer
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from typing import List
-from uuid import uuid4
+from typing import List, Optional
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
+origins = [
+    "http://localhost:3000",
+    "https://yourfrontend.com",
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-users = [{"user_id": "1", "username": "admin", "password": "admin", "role": "admin"}]
-inventory = []
-alerts = []
+class Item(BaseModel):
+    id: int
+    name: str
+    description: Optional[str] = None
+    price: float
+    in_stock: bool
 
 class User(BaseModel):
+    id: int
+    username: str
+    email: str
+    is_active: bool
+
+class LoginRequest(BaseModel):
     username: str
     password: str
 
-class InventoryItem(BaseModel):
-    inventory_id: str
-    product_id: str
-    product_name: str
-    category: str
-    price: float
-    quantity: int
+items = []
+users = []
 
-class Alert(BaseModel):
-    alert_id: str
-    product_id: str
-    threshold: int
-    status: str
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to the FastAPI backend!"}
 
-class SalesTrendReport(BaseModel):
-    product_id: str
-    product_name: str
-    sales_trend: str
+@app.get("/items", response_model=List[Item])
+def get_items():
+    return items
 
-@app.post("/api/auth/login")
-def login(user: User):
-    for u in users:
-        if u["username"] == user.username and u["password"] == user.password:
-            return {"token": str(uuid4()), "role": u["role"]}
-    raise HTTPException(status_code=401, detail="Invalid credentials")
-
-@app.post("/api/auth/logout")
-def logout(token: str = Depends(oauth2_scheme)):
-    return {"message": "Logged out successfully"}
-
-@app.get("/api/inventory", response_model=List[InventoryItem])
-def get_inventory():
-    return inventory
-
-@app.post("/api/inventory", response_model=InventoryItem)
-def add_inventory_item(item: InventoryItem):
-    inventory.append(item)
-    return item
-
-@app.put("/api/inventory/{id}", response_model=InventoryItem)
-def update_inventory_item(id: str, updated_item: InventoryItem):
-    for item in inventory:
-        if item.inventory_id == id:
-            item.product_id = updated_item.product_id
-            item.product_name = updated_item.product_name
-            item.category = updated_item.category
-            item.price = updated_item.price
-            item.quantity = updated_item.quantity
+@app.get("/items/{item_id}", response_model=Item)
+def get_item(item_id: int):
+    for item in items:
+        if item.id == item_id:
             return item
     raise HTTPException(status_code=404, detail="Item not found")
 
-@app.delete("/api/inventory/{id}")
-def delete_inventory_item(id: str):
-    global inventory
-    inventory = [item for item in inventory if item.inventory_id != id]
-    return {"message": "Item deleted successfully"}
+@app.post("/items", response_model=Item)
+def create_item(item: Item):
+    items.append(item)
+    return item
 
-@app.get("/api/alerts", response_model=List[Alert])
-def get_alerts():
-    return alerts
+@app.put("/items/{item_id}", response_model=Item)
+def update_item(item_id: int, updated_item: Item):
+    for index, item in enumerate(items):
+        if item.id == item_id:
+            items[index] = updated_item
+            return updated_item
+    raise HTTPException(status_code=404, detail="Item not found")
 
-@app.post("/api/alerts", response_model=Alert)
-def create_alert(alert: Alert):
-    alerts.append(alert)
-    return alert
+@app.delete("/items/{item_id}")
+def delete_item(item_id: int):
+    for index, item in enumerate(items):
+        if item.id == item_id:
+            del items[index]
+            return {"message": "Item deleted successfully"}
+    raise HTTPException(status_code=404, detail="Item not found")
 
-@app.delete("/api/alerts/{id}")
-def delete_alert(id: str):
-    global alerts
-    alerts = [alert for alert in alerts if alert.alert_id != id]
-    return {"message": "Alert deleted successfully"}
+@app.get("/users", response_model=List[User])
+def get_users():
+    return users
 
-@app.get("/api/sales/trends", response_model=List[SalesTrendReport])
-def get_sales_trends():
-    sales_trends = [
-        {"product_id": "101", "product_name": "Product A", "sales_trend": "Increasing"},
-        {"product_id": "102", "product_name": "Product B", "sales_trend": "Decreasing"},
-    ]
-    return sales_trends
+@app.get("/users/{user_id}", response_model=User)
+def get_user(user_id: int):
+    for user in users:
+        if user.id == user_id:
+            return user
+    raise HTTPException(status_code=404, detail="User not found")
+
+@app.post("/users", response_model=User)
+def create_user(user: User):
+    users.append(user)
+    return user
+
+@app.put("/users/{user_id}", response_model=User)
+def update_user(user_id: int, updated_user: User):
+    for index, user in enumerate(users):
+        if user.id == user_id:
+            users[index] = updated_user
+            return updated_user
+    raise HTTPException(status_code=404, detail="User not found")
+
+@app.delete("/users/{user_id}")
+def delete_user(user_id: int):
+    for index, user in enumerate(users):
+        if user.id == user_id:
+            del users[index]
+            return {"message": "User deleted successfully"}
+    raise HTTPException(status_code=404, detail="User not found")
+
+@app.post("/login")
+def login(login_request: LoginRequest):
+    for user in users:
+        if user.username == login_request.username and login_request.password == "password":
+            return {"message": "Login successful", "user": user}
+    raise HTTPException(status_code=401, detail="Invalid credentials")
