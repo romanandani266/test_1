@@ -58,11 +58,6 @@ class Alert(BaseModel):
     threshold: int
     status: str
 
-class SalesTrend(BaseModel):
-    product_id: int
-    product_name: str
-    sales_data: List[int]
-
 def authenticate_user(username: str, password: str):
     user = mock_users.get(username)
     if user and user["password"] == password:
@@ -131,11 +126,3 @@ def delete_alert(id: int):
     global mock_alerts
     mock_alerts = [alert for alert in mock_alerts if alert["alert_id"] != id]
     return {"message": "Alert deleted successfully"}
-
-@app.get("/api/sales/trends", response_model=List[SalesTrend])
-def get_sales_trends():
-    sales_trends = [
-        {"product_id": 101, "product_name": "Pepsi", "sales_data": [100, 120, 90]},
-        {"product_id": 102, "product_name": "Lays", "sales_data": [80, 95, 110]},
-    ]
-    return sales_trends
