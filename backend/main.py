@@ -1,7 +1,7 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Path
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, HttpUrl
-from typing import List, Optional
+from pydantic import BaseModel, HttpUrl, Field
+from typing import List
 from datetime import datetime
 
 app = FastAPI()
@@ -19,30 +19,28 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-class Blog(BaseModel):
+class BlogBase(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)
+    content: str = Field(..., min_length=1)
+    image_url: HttpUrl
+
+class BlogCreate(BlogBase):
+    pass
+
+class BlogUpdate(BlogBase):
+    pass
+
+class Blog(BlogBase):
     id: int
-    title: str
-    content: str
-    image_url: HttpUrl
     created_at: datetime
-
-class BlogCreate(BaseModel):
-    title: str
-    content: str
-    image_url: HttpUrl
-
-class BlogUpdate(BaseModel):
-    title: Optional[str] = None
-    content: Optional[str] = None
-    image_url: Optional[HttpUrl] = None
 
 class LoginRequest(BaseModel):
     username: str
     password: str
 
 class LoginResponse(BaseModel):
-    message: str
-    token: Optional[str] = None
+    access_token: str
+    token_type: str
 
 blogs = []
 blog_id_counter = 1
@@ -53,11 +51,11 @@ def get_all_blogs():
     return blogs
 
 @app.get("/blogs/{blog_id}", response_model=Blog)
-def get_blog(blog_id: int):
+def get_blog(blog_id: int = Path(...)):
     for blog in blogs:
         if blog.id == blog_id:
             return blog
-    raise HTTPException(status_code=404, detail="Blog not found")
+    raise HTTPException(status_code=404, detail="Blog post not found")
 
 @app.post("/blogs", response_model=Blog, status_code=201)
 def create_blog(blog: BlogCreate):
@@ -74,33 +72,29 @@ def create_blog(blog: BlogCreate):
     return new_blog
 
 @app.put("/blogs/{blog_id}", response_model=Blog)
-def update_blog(blog_id: int, blog_update: BlogUpdate):
-    for blog in blogs:
+def update_blog(blog_id: int, updated_blog: BlogUpdate):
+    for index, blog in enumerate(blogs):
         if blog.id == blog_id:
-            if blog_update.title is not None:
-                blog.title = blog_update.title
-            if blog_update.content is not None:
-                blog.content = blog_update.content
-            if blog_update.image_url is not None:
-                blog.image_url = blog_update.image_url
-            return blog
-    raise HTTPException(status_code=404, detail="Blog not found")
+            blogs[index] = Blog(
+                id=blog.id,
+                title=updated_blog.title,
+                content=updated_blog.content,
+                image_url=updated_blog.image_url,
+                created_at=blog.created_at
+            )
+            return blogs[index]
+    raise HTTPException(status_code=404, detail="Blog post not found")
 
-@app.delete("/blogs/{blog_id}", status_code=204)
+@app.delete("/blogs/{blog_id}", response_model=dict)
 def delete_blog(blog_id: int):
-    global blogs
-    blogs = [blog for blog in blogs if blog.id != blog_id]
-    return {"message": "Blog deleted successfully"}
+    for index, blog in enumerate(blogs):
+        if blog.id == blog_id:
+            del blogs[index]
+            return {"message": "Blog post deleted successfully"}
+    raise HTTPException(status_code=404, detail="Blog post not found")
 
 @app.post("/login", response_model=LoginResponse)
 def login(login_request: LoginRequest):
-    username = login_request.username
-    password = login_request.password
-
-    if username in users and users[username] == password:
-        return LoginResponse(message="Login successful", token="fake-jwt-token")
+    if login_request.username in users and users[login_request.username] == login_request.password:
+        return {"access_token": "fake-jwt-token", "token_type": "bearer"}
     raise HTTPException(status_code=401, detail="Invalid username or password")
-
-@app.get("/validate-image-url")
-def validate_image_url(image_url: HttpUrl = Query(...)):
-    return {"message": "Valid image URL", "image_url": image_url}
