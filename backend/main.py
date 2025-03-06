@@ -1,10 +1,8 @@
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, HTTPException, Path
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl, Field
 from typing import List, Optional
-from datetime import datetime, timedelta
-from jose import JWTError, jwt
-from passlib.context import CryptContext
+from datetime import datetime
 
 app = FastAPI()
 
@@ -21,123 +19,85 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-mock_inventory = []
-mock_users = {
-    "admin": {"username": "admin", "password": "admin123", "role": "admin"},
-    "user": {"username": "user", "password": "user123", "role": "user"}
-}
+class BlogBase(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)
+    content: str = Field(..., min_length=1)
+    image_url: HttpUrl
 
-SECRET_KEY = "your_secret_key"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+class BlogCreate(BlogBase):
+    pass
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+class BlogUpdate(BlogBase):
+    pass
 
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-class TokenData(BaseModel):
-    username: Optional[str] = None
-
-class User(BaseModel):
-    username: str
-    role: str
+class Blog(BlogBase):
+    id: int
+    created_at: datetime
 
 class LoginRequest(BaseModel):
     username: str
     password: str
 
-class InventoryItem(BaseModel):
-    product_id: int
-    name: str
-    category: str
-    quantity: int
-    restock_threshold: int
+class LoginResponse(BaseModel):
+    message: str
+    token: Optional[str] = None
 
-def authenticate_user(username: str, password: str):
-    user = mock_users.get(username)
-    if not user or not (user["password"] == password):
-        return False
-    return user
+blogs = []
+blog_id_counter = 1
+users = {"admin": "password123"}
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+@app.get("/blogs", response_model=List[Blog])
+def get_all_blogs():
+    return blogs
 
-def get_current_user(token: str):
-    credentials_exception = HTTPException(
-        status_code=401,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
+@app.get("/blogs/{blog_id}", response_model=Blog)
+def get_blog(blog_id: int = Path(...)):
+    for blog in blogs:
+        if blog.id == blog_id:
+            return blog
+    raise HTTPException(status_code=404, detail="Blog post not found")
+
+@app.post("/blogs", response_model=Blog, status_code=201)
+def create_blog(blog: BlogCreate):
+    global blog_id_counter
+    new_blog = Blog(
+        id=blog_id_counter,
+        title=blog.title,
+        content=blog.content,
+        image_url=blog.image_url,
+        created_at=datetime.now()
     )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-        token_data = TokenData(username=username)
-    except JWTError:
-        raise credentials_exception
-    user = mock_users.get(token_data.username)
-    if user is None:
-        raise credentials_exception
-    return User(username=user["username"], role=user["role"])
+    blogs.append(new_blog)
+    blog_id_counter += 1
+    return new_blog
 
-@app.post("/api/auth/login", response_model=Token)
+@app.put("/blogs/{blog_id}", response_model=Blog)
+def update_blog(blog_id: int, updated_blog: BlogUpdate):
+    for index, blog in enumerate(blogs):
+        if blog.id == blog_id:
+            blogs[index] = Blog(
+                id=blog.id,
+                title=updated_blog.title,
+                content=updated_blog.content,
+                image_url=updated_blog.image_url,
+                created_at=blog.created_at
+            )
+            return blogs[index]
+    raise HTTPException(status_code=404, detail="Blog post not found")
+
+@app.delete("/blogs/{blog_id}", response_model=dict)
+def delete_blog(blog_id: int):
+    for index, blog in enumerate(blogs):
+        if blog.id == blog_id:
+            del blogs[index]
+            return {"message": "Blog post deleted successfully"}
+    raise HTTPException(status_code=404, detail="Blog post not found")
+
+@app.post("/login", response_model=LoginResponse)
 def login(login_request: LoginRequest):
-    user = authenticate_user(login_request.username, login_request.password)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid username or password")
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user["username"]}, expires_delta=access_token_expires
-    )
-    return {"access_token": access_token, "token_type": "bearer"}
+    username = login_request.username
+    password = login_request.password
 
-@app.post("/api/auth/logout")
-def logout():
-    return {"message": "Successfully logged out"}
-
-@app.get("/api/inventory", response_model=List[InventoryItem])
-def get_inventory(
-    product_id: Optional[int] = Query(None),
-    category: Optional[str] = Query(None),
-    token: str = Depends(get_current_user),
-):
-    filtered_inventory = mock_inventory
-    if product_id:
-        filtered_inventory = [item for item in filtered_inventory if item.product_id == product_id]
-    if category:
-        filtered_inventory = [item for item in filtered_inventory if item.category == category]
-    return filtered_inventory
-
-@app.post("/api/inventory", response_model=InventoryItem)
-def add_inventory(item: InventoryItem, token: str = Depends(get_current_user)):
-    current_user = get_current_user(token)
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Not authorized to add inventory")
-    mock_inventory.append(item)
-    return item
-
-@app.post("/api/inventory/alerts")
-def restocking_alerts(token: str = Depends(get_current_user)):
-    alerts = [
-        {
-            "product_id": item.product_id,
-            "name": item.name,
-            "message": "Restock needed"
-        }
-        for item in mock_inventory if item.quantity < item.restock_threshold
-    ]
-    return {"alerts": alerts}
-
-@app.get("/api/inventory/sales-trends")
-def sales_trends(token: str = Depends(get_current_user)):
-    return {"message": "Sales trend analysis not implemented yet"}
+    if username in users and users[username] == password:
+        return {"message": "Login successful", "token": "fake-jwt-token"}
+    raise HTTPException(status_code=401, detail="Invalid username or password")
