@@ -8,7 +8,7 @@ app = FastAPI()
 
 origins = [
     "http://localhost:3000",
-    "https://yourfrontend.com"
+    "https://yourfrontend.com",
 ]
 
 app.add_middleware(
@@ -16,7 +16,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
 class BlogBase(BaseModel):
@@ -34,7 +34,7 @@ class Blog(BlogBase):
     id: int
     created_at: datetime
 
-class UserLogin(BaseModel):
+class LoginRequest(BaseModel):
     username: str
     password: str
 
@@ -51,7 +51,7 @@ def get_all_blogs():
     return blogs
 
 @app.get("/blogs/{blog_id}", response_model=Blog)
-def get_blog(blog_id: int = Path(..., description="The ID of the blog to retrieve")):
+def get_blog(blog_id: int = Path(...)):
     blog = find_blog(blog_id)
     if not blog:
         raise HTTPException(status_code=404, detail="Blog not found")
@@ -95,7 +95,10 @@ def delete_blog(blog_id: int):
     return {"message": "Blog deleted successfully"}
 
 @app.post("/login")
-def login(user: UserLogin):
-    if user.username in users and users[user.username] == user.password:
+def login(login_request: LoginRequest):
+    username = login_request.username
+    password = login_request.password
+
+    if username in users and users[username] == password:
         return {"message": "Login successful"}
     raise HTTPException(status_code=401, detail="Invalid username or password")
