@@ -1,9 +1,11 @@
-export const handleApiError = (error) => {
-  if (error.response) {
-    console.error("API Error:", error.response.data.detail || error.message);
-    alert(error.response.data.detail || "An error occurred");
-  } else {
-    console.error("Error:", error.message);
-    alert("An error occurred");
-  }
+export const saveToken = (token) => {
+  localStorage.setItem("token", token);
+};
+
+export const getToken = () => {
+  return localStorage.getItem("token");
+};
+
+export const removeToken = () => {
+  localStorage.removeItem("token");
 };
