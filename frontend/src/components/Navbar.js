@@ -1,23 +1,23 @@
 import React from "react";
-import { AppBar, Toolbar, Typography, Button } from "@mui/material";
+import { AppBar, Toolbar, Button } from "@mui/material";
 import { Link } from "react-router-dom";
 
-const Navbar = () => {
+function Navbar() {
   return (
     <AppBar position="static">
       <Toolbar>
-        <Typography variant="h6" sx={{ flexGrow: 1 }}>
-          Modern Blog Platform
-        </Typography>
         <Button color="inherit" component={Link} to="/">
-          Home
+          Login
         </Button>
-        <Button color="inherit" component={Link} to="/create">
-          Create Blog
+        <Button color="inherit" component={Link} to="/inventory">
+          Inventory
+        </Button>
+        <Button color="inherit" component={Link} to="/user-rights">
+          User Rights
         </Button>
       </Toolbar>
     </AppBar>
   );
-};
+}
 
 export default Navbar;
