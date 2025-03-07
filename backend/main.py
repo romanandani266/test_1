@@ -1,10 +1,9 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
-from typing import List, Optional
 from pydantic import BaseModel
-import uuid
-import os
+from typing import List, Optional
+from datetime import datetime, timedelta
+from jose import JWTError, jwt
 
 app = FastAPI()
 
@@ -21,118 +20,138 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-blogs = {}
-users = {}
+SECRET_KEY = "your_secret_key"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-class Blog(BaseModel):
-    id: str
-    title: str
-    content: str
-    image_url: Optional[str] = None
-    created_at: str
-    updated_at: str
+users_db = {
+    "admin": {"username": "admin", "password_hash": "admin123", "role": "admin"},
+    "user": {"username": "user", "password_hash": "user123", "role": "user"},
+}
 
-class BlogCreate(BaseModel):
-    title: str
-    content: str
-    image_url: Optional[str] = None
+inventory_db = [
+    {"id": 1, "name": "Item A", "quantity": 10, "price": 100.0},
+    {"id": 2, "name": "Item B", "quantity": 5, "price": 50.0},
+]
 
-class BlogUpdate(BaseModel):
-    title: Optional[str] = None
-    content: Optional[str] = None
-    image_url: Optional[str] = None
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
 
 class User(BaseModel):
-    id: str
     username: str
-    email: str
-    password_hash: str
+    role: str
 
-class UserCreate(BaseModel):
+class InventoryItem(BaseModel):
+    id: int
+    name: str
+    quantity: int
+    price: float
+
+class UserData(BaseModel):
     username: str
-    email: str
-    password: str
+    role: str
 
-class UserLogin(BaseModel):
-    email: str
-    password: str
+def authenticate_user(username: str, password: str):
+    user = users_db.get(username)
+    if user and user["password_hash"] == password:
+        return user
+    return None
 
-def generate_id():
-    return str(uuid.uuid4())
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
-@app.get("/blogs", response_model=List[Blog])
-def get_blogs():
-    return list(blogs.values())
-
-@app.get("/blogs/{blog_id}", response_model=Blog)
-def get_blog(blog_id: str):
-    if blog_id not in blogs:
-        raise HTTPException(status_code=404, detail="Blog not found")
-    return blogs[blog_id]
-
-@app.post("/blogs", response_model=Blog, status_code=201)
-def create_blog(blog: BlogCreate):
-    blog_id = generate_id()
-    new_blog = Blog(
-        id=blog_id,
-        title=blog.title,
-        content=blog.content,
-        image_url=blog.image_url,
-        created_at="2023-01-01T00:00:00Z",
-        updated_at="2023-01-01T00:00:00Z",
+def get_current_user(token: str):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
     )
-    blogs[blog_id] = new_blog
-    return new_blog
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+        role: str = payload.get("role")
+        return {"username": username, "role": role}
+    except JWTError:
+        raise credentials_exception
 
-@app.put("/blogs/{blog_id}", response_model=Blog)
-def update_blog(blog_id: str, blog_update: BlogUpdate):
-    if blog_id not in blogs:
-        raise HTTPException(status_code=404, detail="Blog not found")
-    existing_blog = blogs[blog_id]
-    updated_blog = existing_blog.copy(update=blog_update.dict(exclude_unset=True))
-    updated_blog.updated_at = "2023-01-01T00:00:00Z"
-    blogs[blog_id] = updated_blog
-    return updated_blog
+def get_current_admin_user(current_user: dict):
+    if current_user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+    return current_user
 
-@app.delete("/blogs/{blog_id}", status_code=204)
-def delete_blog(blog_id: str):
-    if blog_id not in blogs:
-        raise HTTPException(status_code=404, detail="Blog not found")
-    del blogs[blog_id]
-    return JSONResponse(status_code=204, content={"message": "Blog deleted successfully"})
-
-@app.post("/upload-image")
-def upload_image(file: UploadFile = File(...)):
-    allowed_extensions = {"jpg", "jpeg", "png", "gif"}
-    file_extension = file.filename.split(".")[-1].lower()
-    if file_extension not in allowed_extensions:
-        raise HTTPException(status_code=400, detail="Invalid file format. Allowed formats: jpg, jpeg, png, gif")
-    file_location = f"images/{file.filename}"
-    with open(file_location, "wb") as f:
-        f.write(file.file.read())
-    return {"image_url": f"/{file_location}"}
-
-@app.post("/register", response_model=User, status_code=201)
-def register_user(user: UserCreate):
-    user_id = generate_id()
-    if any(u.email == user.email for u in users.values()):
-        raise HTTPException(status_code=400, detail="Email already registered")
-    new_user = User(
-        id=user_id,
-        username=user.username,
-        email=user.email,
-        password_hash=user.password,
+@app.post("/auth/login", response_model=Token)
+def login(login_request: LoginRequest):
+    user = authenticate_user(login_request.username, login_request.password)
+    if not user:
+        raise HTTPException(status_code=400, detail="Incorrect username or password")
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user["username"], "role": user["role"]}, expires_delta=access_token_expires
     )
-    users[user_id] = new_user
-    return new_user
+    return {"access_token": access_token, "token_type": "bearer"}
 
-@app.post("/login")
-def login_user(user: UserLogin):
-    for u in users.values():
-        if u.email == user.email and u.password_hash == user.password:
-            return {"message": "Login successful", "user_id": u.id}
-    raise HTTPException(status_code=401, detail="Invalid email or password")
+@app.get("/auth/roles", response_model=List[str])
+def get_roles(token: str):
+    current_user = get_current_user(token)
+    return [current_user["role"]]
 
-@app.get("/dark-mode")
-def toggle_dark_mode(enabled: bool = Form(...)):
-    return {"dark_mode_enabled": enabled}
+@app.get("/inventory", response_model=List[InventoryItem])
+def get_inventory(token: str):
+    current_user = get_current_user(token)
+    return inventory_db
+
+@app.post("/inventory", response_model=InventoryItem)
+def add_inventory(item: InventoryItem, token: str):
+    current_user = get_current_user(token)
+    get_current_admin_user(current_user)
+    inventory_db.append(item.dict())
+    return item
+
+@app.put("/inventory/{id}", response_model=InventoryItem)
+def update_inventory(id: int, item: InventoryItem, token: str):
+    current_user = get_current_user(token)
+    get_current_admin_user(current_user)
+    for i, inv_item in enumerate(inventory_db):
+        if inv_item["id"] == id:
+            inventory_db[i] = item.dict()
+            return item
+    raise HTTPException(status_code=404, detail="Item not found")
+
+@app.delete("/inventory/{id}")
+def delete_inventory(id: int, token: str):
+    current_user = get_current_user(token)
+    get_current_admin_user(current_user)
+    for i, inv_item in enumerate(inventory_db):
+        if inv_item["id"] == id:
+            del inventory_db[i]
+            return {"detail": "Item deleted"}
+    raise HTTPException(status_code=404, detail="Item not found")
+
+@app.get("/user/data", response_model=UserData)
+def get_user_data(token: str):
+    current_user = get_current_user(token)
+    return {"username": current_user["username"], "role": current_user["role"]}
+
+@app.delete("/user/data")
+def delete_user_data(token: str):
+    current_user = get_current_user(token)
+    return {"detail": f"User data for {current_user['username']} has been deleted"}
+
+@app.post("/user/opt-out")
+def opt_out_data_sharing(token: str):
+    current_user = get_current_user(token)
+    return {"detail": f"User {current_user['username']} has opted out of data sharing"}
