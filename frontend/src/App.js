@@ -1,45 +1,34 @@
 import React from "react";
 import { Routes, Route, Link } from "react-router-dom";
-import { AppBar, Toolbar, Button, Container } from "@mui/material";
-import Home from "./pages/Home";
-import Profile from "./pages/Profile";
-import Login from "./components/Auth/Login";
-import Register from "./components/Auth/Register";
-import DataList from "./components/Data/DataList";
+import { AppBar, Toolbar, Typography, Button, CssBaseline } from "@mui/material";
+import HomePage from "./pages/HomePage";
+import CreateEditPage from "./pages/CreateEditPage";
+import BlogDetailPage from "./pages/BlogDetailPage";
 
 const App = () => {
   return (
-    <div>
+    <>
+      <CssBaseline />
       <AppBar position="static">
         <Toolbar>
+          <Typography variant="h6" sx={{ flexGrow: 1 }}>
+            My Blog App
+          </Typography>
           <Button color="inherit" component={Link} to="/">
             Home
           </Button>
-          <Button color="inherit" component={Link} to="/profile">
-            Profile
-          </Button>
-          <Button color="inherit" component={Link} to="/login">
-            Login
-          </Button>
-          <Button color="inherit" component={Link} to="/register">
-            Register
-          </Button>
-          <Button color="inherit" component={Link} to="/data">
-            Data
+          <Button color="inherit" component={Link} to="/create">
+            Create Blog
           </Button>
         </Toolbar>
       </AppBar>
-
-      <Container>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/data" element={<DataList />} />
-        </Routes>
-      </Container>
-    </div>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/create" element={<CreateEditPage />} />
+        <Route path="/edit/:id" element={<CreateEditPage />} />
+        <Route path="/blogs/:id" element={<BlogDetailPage />} />
+      </Routes>
+    </>
   );
 };
 
