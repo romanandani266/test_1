@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { TextField, Button, Box } from "@mui/material";
 import { createBlog, updateBlog, getBlogById } from "../api";
+import { TextField, Button, Container } from "@mui/material";
 
 const CreateEditPage = () => {
   const { id } = useParams();
@@ -32,39 +32,41 @@ const CreateEditPage = () => {
       }
       navigate("/");
     } catch (error) {
-      console.error("Error submitting form:", error);
+      console.error("Error saving blog:", error);
     }
   };
 
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ padding: 2 }}>
-      <TextField
-        label="Title"
-        fullWidth
-        margin="normal"
-        value={formData.title}
-        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-      />
-      <TextField
-        label="Content"
-        fullWidth
-        multiline
-        rows={4}
-        margin="normal"
-        value={formData.content}
-        onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-      />
-      <TextField
-        label="Image URL"
-        fullWidth
-        margin="normal"
-        value={formData.image_url}
-        onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
-      />
-      <Button type="submit" variant="contained" color="primary">
-        {id ? "Update Blog" : "Create Blog"}
-      </Button>
-    </Box>
+    <Container>
+      <form onSubmit={handleSubmit}>
+        <TextField
+          label="Title"
+          fullWidth
+          margin="normal"
+          value={formData.title}
+          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+        />
+        <TextField
+          label="Content"
+          fullWidth
+          multiline
+          rows={4}
+          margin="normal"
+          value={formData.content}
+          onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+        />
+        <TextField
+          label="Image URL"
+          fullWidth
+          margin="normal"
+          value={formData.image_url}
+          onChange={(e) => setFormData({ ...formData, image_url: e.target.value })}
+        />
+        <Button type="submit" variant="contained" color="primary">
+          {id ? "Update Blog" : "Create Blog"}
+        </Button>
+      </form>
+    </Container>
   );
 };
 
