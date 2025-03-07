@@ -1,34 +1,24 @@
 import React from "react";
-import { Routes, Route, Link } from "react-router-dom";
-import { AppBar, Toolbar, Typography, Button, CssBaseline } from "@mui/material";
-import HomePage from "./pages/HomePage";
-import CreateEditPage from "./pages/CreateEditPage";
-import BlogDetailPage from "./pages/BlogDetailPage";
+import { Routes, Route } from "react-router-dom";
+import { CssBaseline, ThemeProvider } from "@mui/material";
+import theme from "./theme";
+import Navbar from "./components/Navbar";
+import BlogList from "./components/BlogList";
+import BlogDetail from "./components/BlogDetail";
+import BlogForm from "./components/BlogForm";
 
 const App = () => {
   return (
-    <>
+    <ThemeProvider theme={theme}>
       <CssBaseline />
-      <AppBar position="static">
-        <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            My Blog App
-          </Typography>
-          <Button color="inherit" component={Link} to="/">
-            Home
-          </Button>
-          <Button color="inherit" component={Link} to="/create">
-            Create Blog
-          </Button>
-        </Toolbar>
-      </AppBar>
+      <Navbar />
       <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/create" element={<CreateEditPage />} />
-        <Route path="/edit/:id" element={<CreateEditPage />} />
-        <Route path="/blogs/:id" element={<BlogDetailPage />} />
+        <Route path="/" element={<BlogList />} />
+        <Route path="/blogs/:id" element={<BlogDetail />} />
+        <Route path="/create" element={<BlogForm />} />
+        <Route path="/edit/:id" element={<BlogForm />} />
       </Routes>
-    </>
+    </ThemeProvider>
   );
 };
 
