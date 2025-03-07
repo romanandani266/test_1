@@ -1,38 +1,22 @@
-import React, { useEffect, useState } from "react";
-import { getInventory } from "../api";
-import { Container, Typography, List, ListItem } from "@mui/material";
+// This is the main App component
+// This file defines the structure of the application
+// The App component serves as the root of the application
+// Importing the Login component
+import Login from "./components/Login";
+import Inventory from "./components/Inventory";
+import UserRights from "./components/UserRights";
 
-function Inventory() {
-  const [inventory, setInventory] = useState([]);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    const fetchInventory = async () => {
-      try {
-        const token = localStorage.getItem("token");
-        const data = await getInventory(token);
-        setInventory(data);
-      } catch (err) {
-        setError(err.message);
-      }
-    };
-
-    fetchInventory();
-  }, []);
-
+function App() {
   return (
-    <Container>
-      <Typography variant="h4">Inventory</Typography>
-      {error && <Typography color="error">{error}</Typography>}
-      <List>
-        {inventory.map((item) => (
-          <ListItem key={item.id}>
-            {item.name} - Quantity: {item.quantity} - Price: ${item.price}
-          </ListItem>
-        ))}
-      </List>
-    </Container>
+    <div>
+      <Navbar />
+      <Routes>
+        <Route path="/" element={<Login />} />
+        <Route path="/inventory" element={<Inventory />} />
+        <Route path="/user-rights" element={<UserRights />} />
+      </Routes>
+    </div>
   );
 }
 
-export default Inventory;
+export default App;
