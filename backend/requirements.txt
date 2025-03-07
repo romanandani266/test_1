@@ -1,4 +1,4 @@
 fastapi
-pydantic
-jose
 uvicorn
+pydantic
+python-jose
