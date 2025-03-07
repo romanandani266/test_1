@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, Path
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, HttpUrl, Field
-from typing import List, Optional
+from typing import List
 from datetime import datetime
 
 app = FastAPI()
@@ -16,12 +16,12 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 
 class BlogBase(BaseModel):
-    title: str = Field(..., min_length=1, max_length=255)
-    content: str = Field(..., min_length=1)
+    title: str = Field(..., max_length=255)
+    content: str
     image_url: HttpUrl
 
 class BlogCreate(BlogBase):
@@ -39,12 +39,12 @@ class LoginRequest(BaseModel):
     password: str
 
 class LoginResponse(BaseModel):
-    message: str
-    token: Optional[str] = None
+    access_token: str
+    token_type: str
 
 blogs = []
 blog_id_counter = 1
-users = {"user@example.com": "securepassword"}
+users = {"admin": "password123"}
 
 @app.get("/blogs", response_model=List[Blog])
 def get_all_blogs():
@@ -65,7 +65,7 @@ def create_blog(blog: BlogCreate):
         title=blog.title,
         content=blog.content,
         image_url=blog.image_url,
-        created_at=datetime.now(),
+        created_at=datetime.utcnow()
     )
     blogs.append(new_blog)
     blog_id_counter += 1
@@ -80,22 +80,21 @@ def update_blog(blog_id: int, updated_blog: BlogUpdate):
                 title=updated_blog.title,
                 content=updated_blog.content,
                 image_url=updated_blog.image_url,
-                created_at=blog.created_at,
+                created_at=blog.created_at
             )
             return blogs[index]
     raise HTTPException(status_code=404, detail="Blog not found")
 
-@app.delete("/blogs/{blog_id}", response_model=dict)
+@app.delete("/blogs/{blog_id}", status_code=204)
 def delete_blog(blog_id: int):
     for index, blog in enumerate(blogs):
         if blog.id == blog_id:
             del blogs[index]
-            return {"message": "Blog deleted successfully"}
+            return
     raise HTTPException(status_code=404, detail="Blog not found")
 
 @app.post("/login", response_model=LoginResponse)
 def login(login_request: LoginRequest):
     if login_request.username in users and users[login_request.username] == login_request.password:
-        token = "mock-token-for-" + login_request.username
-        return {"message": "Login successful", "token": token}
+        return LoginResponse(access_token="fake-jwt-token", token_type="bearer")
     raise HTTPException(status_code=401, detail="Invalid username or password")
