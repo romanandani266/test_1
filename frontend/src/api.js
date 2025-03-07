@@ -10,7 +10,7 @@ export const login = async (username, password) => {
     });
     return response.data;
   } catch (error) {
-    throw new Error(error.response?.data?.detail || "Login failed");
+    throw new Error(error.response?.data?.detail || error.message || "Login failed");
   }
 };
 
@@ -21,7 +21,7 @@ export const getInventory = async (token) => {
     });
     return response.data;
   } catch (error) {
-    throw new Error(error.response?.data?.detail || "Failed to fetch inventory");
+    throw new Error(error.response?.data?.detail || error.message || "Failed to fetch inventory");
   }
 };
 
@@ -32,6 +32,6 @@ export const addInventory = async (item, token) => {
     });
     return response.data;
   } catch (error) {
-    throw new Error(error.response?.data?.detail || "Failed to add inventory");
+    throw new Error(error.response?.data?.detail || error.message || "Failed to add inventory");
   }
 };
