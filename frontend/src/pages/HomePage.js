@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Grid } from "@mui/material";
 import BlogCard from "../components/BlogCard";
 import { getAllBlogs } from "../api";
+#comment
 
 const HomePage = () => {
   const [blogs, setBlogs] = useState([]);
