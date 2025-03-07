@@ -32,7 +32,7 @@ const CreateEditPage = () => {
       }
       navigate("/");
     } catch (error) {
-      console.error("Error submitting form:", error);
+      console.error("Error saving blog:", error);
     }
   };
 
@@ -49,9 +49,9 @@ const CreateEditPage = () => {
         <TextField
           label="Content"
           fullWidth
-          margin="normal"
           multiline
           rows={4}
+          margin="normal"
           value={formData.content}
           onChange={(e) => setFormData({ ...formData, content: e.target.value })}
         />
