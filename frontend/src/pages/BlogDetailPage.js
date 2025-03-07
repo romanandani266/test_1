@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import { getBlogById } from "../api";
-import { Container, Typography } from "@mui/material";
+import { useParams, useNavigate } from "react-router-dom";
+import { Typography, Button, Box } from "@mui/material";
+import { getBlogById, deleteBlog } from "../api";
 
 const BlogDetailPage = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [blog, setBlog] = useState(null);
 
   useEffect(() => {
@@ -19,19 +20,33 @@ const BlogDetailPage = () => {
     fetchBlog();
   }, [id]);
 
+  const handleDelete = async () => {
+    try {
+      await deleteBlog(id);
+      navigate("/");
+    } catch (error) {
+      console.error("Error deleting blog:", error);
+    }
+  };
+
   if (!blog) return <Typography>Loading...</Typography>;
 
   return (
-    <Container>
-      <Typography variant="h3" gutterBottom>
+    <Box sx={{ padding: 2 }}>
+      <Typography variant="h4" gutterBottom>
         {blog.title}
       </Typography>
-      <img src={blog.image_url} alt={blog.title} style={{ width: "100%", marginBottom: "20px" }} />
-      <Typography variant="body1">{blog.content}</Typography>
-      <Typography variant="caption" display="block" gutterBottom>
-        Created at: {new Date(blog.created_at).toLocaleString()}
+      <img src={blog.image_url} alt={blog.title} style={{ width: "100%", marginBottom: "16px" }} />
+      <Typography variant="body1" gutterBottom>
+        {blog.content}
       </Typography>
-    </Container>
+      <Typography variant="caption" display="block" gutterBottom>
+        Created At: {new Date(blog.created_at).toLocaleString()}
+      </Typography>
+      <Button variant="contained" color="secondary" onClick={handleDelete}>
+        Delete Blog
+      </Button>
+    </Box>
   );
 };
 
