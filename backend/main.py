@@ -65,31 +65,30 @@ async def get_inventory():
     return products
 
 @app.post("/api/inventory", response_model=Product)
-async def add_product(product: Product):
+async def add_new_product(product: Product):
     product.product_id = str(uuid4())
-    products.append(product)
+    products.append(product.dict())
     return product
 
 @app.put("/api/inventory", response_model=Product)
 async def update_inventory(product: Product):
     for p in products:
-        if p.product_id == product.product_id:
-            p.quantity = product.quantity
-            p.threshold = product.threshold
-            if p.quantity < p.threshold:
+        if p["product_id"] == product.product_id:
+            p["quantity"] = product.quantity
+            if p["quantity"] < p["threshold"]:
                 alert = Alert(
                     alert_id=str(uuid4()),
-                    product_id=p.product_id,
-                    alert_message=f"Stock for {p.product_name} is below threshold!"
+                    product_id=p["product_id"],
+                    alert_message=f"Stock for {p['product_name']} is below threshold!"
                 )
-                alerts.append(alert)
-            return p
+                alerts.append(alert.dict())
+            return product
     raise HTTPException(status_code=404, detail="Product not found")
 
 @app.delete("/api/inventory/{product_id}")
 async def delete_product(product_id: str):
     global products
-    products = [p for p in products if p.product_id != product_id]
+    products = [p for p in products if p["product_id"] != product_id]
     return {"message": "Product deleted successfully"}
 
 @app.get("/api/alerts", response_model=List[Alert])
@@ -99,7 +98,7 @@ async def get_alerts():
 @app.delete("/api/alerts/{alert_id}")
 async def dismiss_alert(alert_id: str):
     global alerts
-    alerts = [a for a in alerts if a.alert_id != alert_id]
+    alerts = [a for a in alerts if a["alert_id"] != alert_id]
     return {"message": "Alert dismissed successfully"}
 
 @app.get("/api/sales/trends", response_model=List[SalesTrend])
