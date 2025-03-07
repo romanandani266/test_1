@@ -1,38 +1,34 @@
-import React, { useState, useContext } from 'react';
-import { login } from '../../api/auth';
-import { AuthContext } from '../../context/AuthContext';
+import React, { useState } from "react";
+import api from "../../api";
+import { handleApiError } from "../../utils";
 
 const Login = () => {
-  const { login: setAuth } = useContext(AuthContext);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+  const [form, setForm] = useState({ username: "", password: "" });
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    try {
-      const data = await login(username, password);
-      setAuth(data);
-    } catch (err) {
-      setError(err.message || 'Login failed');
-    }
+    api
+      .post("/auth/login", form)
+      .then((response) => {
+        localStorage.setItem("token", response.data.access_token);
+        alert("Login successful!");
+      })
+      .catch(handleApiError);
   };
 
   return (
     <form onSubmit={handleSubmit}>
-      <h2>Login</h2>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
       <input
         type="text"
         placeholder="Username"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
+        value={form.username}
+        onChange={(e) => setForm({ ...form, username: e.target.value })}
       />
       <input
         type="password"
         placeholder="Password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
+        value={form.password}
+        onChange={(e) => setForm({ ...form, password: e.target.value })}
       />
       <button type="submit">Login</button>
     </form>
