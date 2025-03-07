@@ -1,15 +1,15 @@
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, timedelta
-from jose import JWTError, jwt
+import jwt
 
 app = FastAPI()
 
 origins = [
     "http://localhost:3000",
-    "https://yourfrontend.com"
+    "https://yourfrontend.com",
 ]
 
 app.add_middleware(
@@ -17,7 +17,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
 SECRET_KEY = "your_secret_key"
@@ -25,33 +25,35 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 users_db = {}
-entities_db = {}
-jwt_blacklist = set()
+data_db = {}
+refresh_tokens_db = {}
 
 class User(BaseModel):
     id: int
     username: str
+    email: str
     password: str
-    is_admin: bool = False
 
-class UserOut(BaseModel):
+class UserUpdate(BaseModel):
+    username: Optional[str]
+    email: Optional[str]
+    password: Optional[str]
+
+class DataEntry(BaseModel):
     id: int
-    username: str
-    is_admin: bool
+    user_id: int
+    content: str
 
-class Entity(BaseModel):
-    id: int
-    name: str
-    description: str
-    owner_id: int
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
+class DataUpdate(BaseModel):
+    content: Optional[str]
 
 class LoginRequest(BaseModel):
     username: str
     password: str
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
@@ -59,123 +61,112 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
-def get_current_user(token: str):
+def verify_token(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
-        if username is None or token in jwt_blacklist:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid token",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        return users_db.get(username)
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        if username is None:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        return username
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except jwt.PyJWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
-def get_admin_user(current_user: User):
-    if not current_user["is_admin"]:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges required",
-        )
-    return current_user
-
-@app.post("/api/auth/register", response_model=UserOut)
-def register_user(user: User):
-    if user.username in users_db:
-        raise HTTPException(status_code=400, detail="Username already exists")
-    users_db[user.username] = user.dict()
+def get_current_user(token: str):
+    username = verify_token(token)
+    user = next((user for user in users_db.values() if user["username"] == username), None)
+    if user is None:
+        raise HTTPException(status_code=401, detail="User not found")
     return user
 
-@app.post("/api/auth/login", response_model=Token)
+@app.post("/auth/register", response_model=User)
+def register_user(user: User):
+    if user.email in [u["email"] for u in users_db.values()]:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    if user.username in [u["username"] for u in users_db.values()]:
+        raise HTTPException(status_code=400, detail="Username already taken")
+    users_db[user.id] = user.dict()
+    return user
+
+@app.post("/auth/login", response_model=Token)
 def login_user(login_request: LoginRequest):
-    user = users_db.get(login_request.username)
+    user = next((u for u in users_db.values() if u["username"] == login_request.username), None)
     if not user or user["password"] != login_request.password:
-        raise HTTPException(status_code=400, detail="Invalid username or password")
+        raise HTTPException(status_code=401, detail="Invalid credentials")
     access_token = create_access_token(data={"sub": user["username"]})
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.post("/api/auth/logout")
-def logout_user(token: str):
-    jwt_blacklist.add(token)
-    return {"message": "Successfully logged out"}
+@app.post("/auth/refresh", response_model=Token)
+def refresh_token(token: str):
+    username = verify_token(token)
+    access_token = create_access_token(data={"sub": username})
+    return {"access_token": access_token, "token_type": "bearer"}
 
-@app.get("/api/users", response_model=List[UserOut])
-def get_all_users(token: str):
-    current_user = get_current_user(token)
-    get_admin_user(current_user)
-    return [UserOut(**user) for user in users_db.values()]
-
-@app.get("/api/users/{id}", response_model=UserOut)
+@app.get("/users/{id}", response_model=User)
 def get_user(id: int, token: str):
     current_user = get_current_user(token)
-    for user in users_db.values():
-        if user["id"] == id:
-            return UserOut(**user)
-    raise HTTPException(status_code=404, detail="User not found")
+    user = users_db.get(id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 
-@app.put("/api/users/{id}", response_model=UserOut)
-def update_user(id: int, updated_user: User, token: str):
+@app.put("/users/{id}", response_model=User)
+def update_user(id: int, user_update: UserUpdate, token: str):
     current_user = get_current_user(token)
-    for username, user in users_db.items():
-        if user["id"] == id:
-            if current_user["id"] != id and not current_user["is_admin"]:
-                raise HTTPException(status_code=403, detail="Permission denied")
-            users_db[username].update(updated_user.dict())
-            return UserOut(**users_db[username])
-    raise HTTPException(status_code=404, detail="User not found")
+    user = users_db.get(id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.update(user_update.dict(exclude_unset=True))
+    users_db[id] = user
+    return user
 
-@app.delete("/api/users/{id}")
+@app.delete("/users/{id}")
 def delete_user(id: int, token: str):
     current_user = get_current_user(token)
-    get_admin_user(current_user)
-    for username, user in list(users_db.items()):
-        if user["id"] == id:
-            del users_db[username]
-            return {"message": "User deleted successfully"}
-    raise HTTPException(status_code=404, detail="User not found")
+    if id not in users_db:
+        raise HTTPException(status_code=404, detail="User not found")
+    del users_db[id]
+    return {"detail": "User deleted successfully"}
 
-@app.post("/api/entities", response_model=Entity)
-def create_entity(entity: Entity, token: str):
+@app.get("/data", response_model=List[DataEntry])
+def get_data(token: str):
     current_user = get_current_user(token)
-    entity.owner_id = current_user["id"]
-    entities_db[entity.id] = entity.dict()
-    return entity
+    return [data for data in data_db.values() if data["user_id"] == current_user["id"]]
 
-@app.get("/api/entities", response_model=List[Entity])
-def get_all_entities(token: str):
+@app.post("/data", response_model=DataEntry)
+def create_data(data: DataEntry, token: str):
     current_user = get_current_user(token)
-    return [Entity(**entity) for entity in entities_db.values()]
+    data_db[data.id] = data.dict()
+    return data
 
-@app.get("/api/entities/{id}", response_model=Entity)
-def get_entity(id: int, token: str):
+@app.get("/data/{id}", response_model=DataEntry)
+def get_data_by_id(id: int, token: str):
     current_user = get_current_user(token)
-    entity = entities_db.get(id)
-    if not entity or entity["owner_id"] != current_user["id"]:
-        raise HTTPException(status_code=404, detail="Entity not found")
-    return Entity(**entity)
+    data = data_db.get(id)
+    if not data or data["user_id"] != current_user["id"]:
+        raise HTTPException(status_code=404, detail="Data not found")
+    return data
 
-@app.put("/api/entities/{id}", response_model=Entity)
-def update_entity(id: int, updated_entity: Entity, token: str):
+@app.put("/data/{id}", response_model=DataEntry)
+def update_data(id: int, data_update: DataUpdate, token: str):
     current_user = get_current_user(token)
-    entity = entities_db.get(id)
-    if not entity or entity["owner_id"] != current_user["id"]:
-        raise HTTPException(status_code=404, detail="Entity not found")
-    entities_db[id].update(updated_entity.dict())
-    return Entity(**entities_db[id])
+    data = data_db.get(id)
+    if not data or data["user_id"] != current_user["id"]:
+        raise HTTPException(status_code=404, detail="Data not found")
+    data.update(data_update.dict(exclude_unset=True))
+    data_db[id] = data
+    return data
 
-@app.delete("/api/entities/{id}")
-def delete_entity(id: int, token: str):
+@app.delete("/data/{id}")
+def delete_data(id: int, token: str):
     current_user = get_current_user(token)
-    entity = entities_db.get(id)
-    if not entity or entity["owner_id"] != current_user["id"]:
-        raise HTTPException(status_code=404, detail="Entity not found")
-    del entities_db[id]
-    return {"message": "Entity deleted successfully"}
+    data = data_db.get(id)
+    if not data or data["user_id"] != current_user["id"]:
+        raise HTTPException(status_code=404, detail="Data not found")
+    del data_db[id]
+    return {"detail": "Data deleted successfully"}
