@@ -1,4 +1,3 @@
 fastapi
-passlib
-python-jose
+pydantic
 uvicorn
