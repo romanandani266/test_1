@@ -1,9 +1,9 @@
-from fastapi import FastAPI, HTTPException, Depends, status
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime, timedelta
-from jose import JWTError, jwt
+import jwt
 
 app = FastAPI()
 
@@ -24,134 +24,98 @@ SECRET_KEY = "your_secret_key"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-users_db = {
-    "admin": {"username": "admin", "password_hash": "admin123", "role": "admin"},
-    "user": {"username": "user", "password_hash": "user123", "role": "user"},
-}
-
-inventory_db = [
-    {"id": 1, "name": "Item A", "quantity": 10, "price": 100.0},
-    {"id": 2, "name": "Item B", "quantity": 5, "price": 50.0},
-]
+users = {"admin": {"username": "admin", "password": "admin", "role": "admin"}}
+inventory = []
+alerts = []
+sales = []
 
 class Token(BaseModel):
     access_token: str
     token_type: str
 
-class LoginRequest(BaseModel):
+class UserLogin(BaseModel):
     username: str
     password: str
 
-class User(BaseModel):
-    username: str
-    role: str
-
 class InventoryItem(BaseModel):
     id: int
-    name: str
+    product_id: int
     quantity: int
-    price: float
+    last_updated: datetime
 
-class UserData(BaseModel):
-    username: str
-    role: str
+class Alert(BaseModel):
+    id: int
+    product_id: int
+    threshold: int
+    created_at: datetime
 
-def authenticate_user(username: str, password: str):
-    user = users_db.get(username)
-    if user and user["password_hash"] == password:
-        return user
-    return None
+class SalesTrend(BaseModel):
+    product_id: int
+    quantity_sold: int
+    sale_date: datetime
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def get_current_user(token: str):
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-        role: str = payload.get("role")
-        return {"username": username, "role": role}
-    except JWTError:
-        raise credentials_exception
-
-def get_current_admin_user(current_user: dict):
-    if current_user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Not enough permissions")
-    return current_user
-
-@app.post("/auth/login", response_model=Token)
-def login(login_request: LoginRequest):
-    user = authenticate_user(login_request.username, login_request.password)
-    if not user:
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
-    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user["username"], "role": user["role"]}, expires_delta=access_token_expires
-    )
+@app.post("/api/auth/login", response_model=Token)
+def login(user: UserLogin):
+    stored_user = users.get(user.username)
+    if not stored_user or stored_user["password"] != user.password:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
+    access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
-@app.get("/auth/roles", response_model=List[str])
-def get_roles(token: str):
-    current_user = get_current_user(token)
-    return [current_user["role"]]
+@app.post("/api/auth/logout")
+def logout():
+    return {"message": "Logged out successfully"}
 
-@app.get("/inventory", response_model=List[InventoryItem])
-def get_inventory(token: str):
-    current_user = get_current_user(token)
-    return inventory_db
+@app.get("/api/inventory", response_model=List[InventoryItem])
+def get_inventory():
+    return inventory
 
-@app.post("/inventory", response_model=InventoryItem)
-def add_inventory(item: InventoryItem, token: str):
-    current_user = get_current_user(token)
-    get_current_admin_user(current_user)
-    inventory_db.append(item.dict())
+@app.post("/api/inventory", response_model=InventoryItem)
+def add_inventory_item(item: InventoryItem):
+    inventory.append(item)
     return item
 
-@app.put("/inventory/{id}", response_model=InventoryItem)
-def update_inventory(id: int, item: InventoryItem, token: str):
-    current_user = get_current_user(token)
-    get_current_admin_user(current_user)
-    for i, inv_item in enumerate(inventory_db):
-        if inv_item["id"] == id:
-            inventory_db[i] = item.dict()
-            return item
-    raise HTTPException(status_code=404, detail="Item not found")
+@app.put("/api/inventory/{id}")
+def update_inventory_item(id: int, updated_item: InventoryItem):
+    for item in inventory:
+        if item.id == id:
+            item.product_id = updated_item.product_id
+            item.quantity = updated_item.quantity
+            item.last_updated = datetime.utcnow()
+            return {"message": "Inventory item updated successfully"}
+    raise HTTPException(status_code=404, detail="Inventory item not found")
 
-@app.delete("/inventory/{id}")
-def delete_inventory(id: int, token: str):
-    current_user = get_current_user(token)
-    get_current_admin_user(current_user)
-    for i, inv_item in enumerate(inventory_db):
-        if inv_item["id"] == id:
-            del inventory_db[i]
-            return {"detail": "Item deleted"}
-    raise HTTPException(status_code=404, detail="Item not found")
+@app.delete("/api/inventory/{id}")
+def delete_inventory_item(id: int):
+    global inventory
+    inventory = [item for item in inventory if item.id != id]
+    return {"message": "Inventory item deleted successfully"}
 
-@app.get("/user/data", response_model=UserData)
-def get_user_data(token: str):
-    current_user = get_current_user(token)
-    return {"username": current_user["username"], "role": current_user["role"]}
+@app.get("/api/alerts", response_model=List[Alert])
+def get_alerts():
+    return alerts
 
-@app.delete("/user/data")
-def delete_user_data(token: str):
-    current_user = get_current_user(token)
-    return {"detail": f"User data for {current_user['username']} has been deleted"}
+@app.post("/api/alerts", response_model=Alert)
+def create_alert(alert: Alert):
+    alerts.append(alert)
+    return alert
 
-@app.post("/user/opt-out")
-def opt_out_data_sharing(token: str):
-    current_user = get_current_user(token)
-    return {"detail": f"User {current_user['username']} has opted out of data sharing"}
+@app.delete("/api/alerts/{id}")
+def delete_alert(id: int):
+    global alerts
+    alerts = [alert for alert in alerts if alert.id != id]
+    return {"message": "Alert deleted successfully"}
+
+@app.get("/api/sales/trends", response_model=List[SalesTrend])
+def get_sales_trends():
+    return sales
