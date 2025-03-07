@@ -1,9 +1,7 @@
-from fastapi import FastAPI, HTTPException, status, Depends
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
-from datetime import datetime, timedelta
-import jwt
+from typing import Optional, List
 
 app = FastAPI()
 
@@ -20,121 +18,90 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-SECRET_KEY = "your_secret_key"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+class InventoryItem(BaseModel):
+    product_id: str
+    location_id: str
+    quantity: int
 
-mock_users = {
-    "admin": {"username": "admin", "password": "admin123", "role": "admin"},
-    "user": {"username": "user", "password": "user123", "role": "user"},
-}
+class RestockingAlert(BaseModel):
+    product_id: str
+    location_id: str
+    threshold: int
 
-mock_inventory = []
-mock_alerts = []
-mock_sales = []
-
-class Token(BaseModel):
-    access_token: str
-    token_type: str
-
-class UserLogin(BaseModel):
+class LoginRequest(BaseModel):
     username: str
     password: str
 
-class InventoryItem(BaseModel):
-    id: int
-    product_id: int
-    product_name: str
-    category: Optional[str]
-    quantity: int
-    last_updated: datetime
+mock_inventory = [
+    {"product_id": "prod-1", "location_id": "loc-1", "quantity": 100},
+    {"product_id": "prod-2", "location_id": "loc-1", "quantity": 50},
+]
 
-class Alert(BaseModel):
-    id: int
-    product_id: int
-    threshold: int
-    created_at: datetime
+mock_alerts = [
+    {"product_id": "prod-1", "location_id": "loc-1", "threshold": 20},
+]
 
-class SalesTrend(BaseModel):
-    product_id: int
-    product_name: str
-    total_sold: int
-    trend: str
+mock_sales_trends = [
+    {"product_id": "prod-1", "location_id": "loc-1", "sales_data": [10, 20, 30]},
+]
 
-def authenticate_user(username: str, password: str):
-    user = mock_users.get(username)
-    if user and user["password"] == password:
-        return user
-    return None
+mock_users = {
+    "admin": "password123",
+}
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-@app.post("/api/auth/login", response_model=Token)
-def login(user: UserLogin):
-    authenticated_user = authenticate_user(user.username, user.password)
-    if not authenticated_user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
-    access_token = create_access_token(data={"sub": user.username})
-    return {"access_token": access_token, "token_type": "bearer"}
-
-@app.post("/api/auth/logout")
-def logout():
-    return {"message": "Logged out successfully"}
+@app.post("/api/login")
+def login(request: LoginRequest):
+    if request.username in mock_users and mock_users[request.username] == request.password:
+        return {"message": "Login successful", "username": request.username}
+    raise HTTPException(status_code=401, detail="Invalid username or password")
 
 @app.get("/api/inventory", response_model=List[InventoryItem])
-def get_inventory():
-    return mock_inventory
+def fetch_inventory(location_id: Optional[str] = None, product_id: Optional[str] = None):
+    filtered_inventory = mock_inventory
+    if location_id:
+        filtered_inventory = [item for item in filtered_inventory if item["location_id"] == location_id]
+    if product_id:
+        filtered_inventory = [item for item in filtered_inventory if item["product_id"] == product_id]
+    if not filtered_inventory:
+        raise HTTPException(status_code=404, detail="No inventory data found for the given filters.")
+    return filtered_inventory
 
-@app.post("/api/inventory")
-def add_inventory_item(item: InventoryItem):
-    mock_inventory.append(item)
-    return {"message": "Inventory item added successfully", "item_id": item.id}
+@app.put("/api/inventory", response_model=InventoryItem)
+def update_inventory(item: InventoryItem):
+    for inventory_item in mock_inventory:
+        if inventory_item["product_id"] == item.product_id and inventory_item["location_id"] == item.location_id:
+            inventory_item["quantity"] = item.quantity
+            return inventory_item
+    raise HTTPException(status_code=404, detail="Inventory item not found.")
 
-@app.put("/api/inventory/{id}")
-def update_inventory_item(id: int, item: InventoryItem):
-    for i, inv_item in enumerate(mock_inventory):
-        if inv_item.id == id:
-            mock_inventory[i] = item
-            return {"message": "Inventory item updated successfully"}
-    raise HTTPException(status_code=404, detail="Inventory item not found")
+@app.get("/api/alerts", response_model=List[RestockingAlert])
+def fetch_alerts(location_id: Optional[str] = None):
+    filtered_alerts = mock_alerts
+    if location_id:
+        filtered_alerts = [alert for alert in filtered_alerts if alert["location_id"] == location_id]
+    if not filtered_alerts:
+        raise HTTPException(status_code=404, detail="No alerts found for the given location.")
+    return filtered_alerts
 
-@app.delete("/api/inventory/{id}")
-def delete_inventory_item(id: int):
-    for i, inv_item in enumerate(mock_inventory):
-        if inv_item.id == id:
-            del mock_inventory[i]
-            return {"message": "Inventory item deleted successfully"}
-    raise HTTPException(status_code=404, detail="Inventory item not found")
+@app.post("/api/alerts", response_model=RestockingAlert)
+def create_alert(alert: RestockingAlert):
+    for existing_alert in mock_alerts:
+        if existing_alert["product_id"] == alert.product_id and existing_alert["location_id"] == alert.location_id:
+            raise HTTPException(status_code=409, detail="Alert already exists for the given product and location.")
+    mock_alerts.append(alert.dict())
+    return alert
 
-@app.get("/api/alerts", response_model=List[Alert])
-def get_alerts():
-    return mock_alerts
+@app.get("/api/sales/trends")
+def fetch_sales_trends(product_id: Optional[str] = None, location_id: Optional[str] = None):
+    filtered_trends = mock_sales_trends
+    if product_id:
+        filtered_trends = [trend for trend in filtered_trends if trend["product_id"] == product_id]
+    if location_id:
+        filtered_trends = [trend for trend in filtered_trends if trend["location_id"] == location_id]
+    if not filtered_trends:
+        raise HTTPException(status_code=404, detail="No sales trend data found for the given filters.")
+    return filtered_trends
 
-@app.post("/api/alerts")
-def create_alert(alert: Alert):
-    mock_alerts.append(alert)
-    return {"message": "Alert created successfully", "alert_id": alert.id}
-
-@app.delete("/api/alerts/{id}")
-def delete_alert(id: int):
-    for i, alert in enumerate(mock_alerts):
-        if alert.id == id:
-            del mock_alerts[i]
-            return {"message": "Alert deleted successfully"}
-    raise HTTPException(status_code=404, detail="Alert not found")
-
-@app.get("/api/sales/trends", response_model=List[SalesTrend])
-def get_sales_trends():
-    trends = [
-        SalesTrend(product_id=1, product_name="Product A", total_sold=100, trend="Increasing"),
-        SalesTrend(product_id=2, product_name="Product B", total_sold=50, trend="Decreasing"),
-    ]
-    return trends
+@app.get("/")
+def root():
+    return {"message": "Welcome to the Retail Inventory Management System API!"}
