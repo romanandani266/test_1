@@ -1,32 +1,46 @@
 import React from "react";
 import { Routes, Route, Link } from "react-router-dom";
-import { AppBar, Toolbar, Typography, Button } from "@mui/material";
-import HomePage from "./pages/HomePage";
-import CreateEditPage from "./pages/CreateEditPage";
-import BlogDetailPage from "./pages/BlogDetailPage";
+import { AppBar, Toolbar, Button } from "@mui/material";
+import Home from "./components/Home";
+import Login from "./components/Login";
+import Register from "./components/Register";
+import Profile from "./components/Profile";
+import AuditLogs from "./components/AuditLogs";
+import PrivacyPolicy from "./components/PrivacyPolicy";
 
 const App = () => {
   return (
     <div>
       <AppBar position="static">
         <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            My Blog Platform
-          </Typography>
           <Button color="inherit" component={Link} to="/">
             Home
           </Button>
-          <Button color="inherit" component={Link} to="/create">
-            Create Blog
+          <Button color="inherit" component={Link} to="/login">
+            Login
+          </Button>
+          <Button color="inherit" component={Link} to="/register">
+            Register
+          </Button>
+          <Button color="inherit" component={Link} to="/profile">
+            Profile
+          </Button>
+          <Button color="inherit" component={Link} to="/audit-logs">
+            Audit Logs
+          </Button>
+          <Button color="inherit" component={Link} to="/privacy-policy">
+            Privacy Policy
           </Button>
         </Toolbar>
       </AppBar>
 
       <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/create" element={<CreateEditPage />} />
-        <Route path="/edit/:id" element={<CreateEditPage />} />
-        <Route path="/blogs/:id" element={<BlogDetailPage />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/audit-logs" element={<AuditLogs />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
       </Routes>
     </div>
   );
