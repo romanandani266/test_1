@@ -1,14 +1,14 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, HttpUrl, Field
 from typing import List, Optional
-from uuid import uuid4
+from datetime import datetime
 
 app = FastAPI()
 
 origins = [
     "http://localhost:3000",
-    "https://yourfrontend.com",
+    "https://yourfrontend.com"
 ]
 
 app.add_middleware(
@@ -16,91 +16,95 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 
-users = [
-    {"user_id": str(uuid4()), "username": "admin", "password": "admin123", "role": "admin"},
-    {"user_id": str(uuid4()), "username": "manager", "password": "manager123", "role": "manager"},
-]
+class Blog(BaseModel):
+    id: int
+    title: str = Field(..., max_length=255)
+    content: str
+    image_url: HttpUrl
+    created_at: datetime
 
-products = []
-alerts = []
-sales_trends = []
+class BlogCreate(BaseModel):
+    title: str = Field(..., max_length=255)
+    content: str
+    image_url: HttpUrl
 
-class UserLogin(BaseModel):
+class BlogUpdate(BaseModel):
+    title: Optional[str] = Field(None, max_length=255)
+    content: Optional[str]
+    image_url: Optional[HttpUrl]
+
+class LoginRequest(BaseModel):
     username: str
     password: str
 
-class Product(BaseModel):
-    product_id: Optional[str]
-    product_name: str
-    quantity: int
-    threshold: int
+class LoginResponse(BaseModel):
+    message: str
+    token: str
 
-class Alert(BaseModel):
-    alert_id: Optional[str]
-    product_id: str
-    alert_message: str
+blogs = []
+users = {"admin": "password123"}
+blog_id_counter = 1
 
-class SalesTrend(BaseModel):
-    trend_id: Optional[str]
-    product_id: str
-    sales_date: str
-    quantity_sold: int
+@app.get("/blogs", response_model=List[Blog])
+def get_all_blogs():
+    return blogs
 
-@app.post("/api/auth/login")
-async def login(user: UserLogin):
-    for u in users:
-        if u["username"] == user.username and u["password"] == user.password:
-            return {"access_token": u["username"], "token_type": "bearer"}
+@app.get("/blogs/{blog_id}", response_model=Blog)
+def get_blog(blog_id: int):
+    for blog in blogs:
+        if blog.id == blog_id:
+            return blog
+    raise HTTPException(status_code=404, detail="Blog not found")
+
+@app.post("/blogs", response_model=Blog, status_code=201)
+def create_blog(blog: BlogCreate):
+    global blog_id_counter
+    new_blog = Blog(
+        id=blog_id_counter,
+        title=blog.title,
+        content=blog.content,
+        image_url=blog.image_url,
+        created_at=datetime.utcnow()
+    )
+    blogs.append(new_blog)
+    blog_id_counter += 1
+    return new_blog
+
+@app.put("/blogs/{blog_id}", response_model=Blog)
+def update_blog(blog_id: int, blog_update: BlogUpdate):
+    for blog in blogs:
+        if blog.id == blog_id:
+            if blog_update.title is not None:
+                blog.title = blog_update.title
+            if blog_update.content is not None:
+                blog.content = blog_update.content
+            if blog_update.image_url is not None:
+                blog.image_url = blog_update.image_url
+            return blog
+    raise HTTPException(status_code=404, detail="Blog not found")
+
+@app.delete("/blogs/{blog_id}", status_code=204)
+def delete_blog(blog_id: int):
+    global blogs
+    blogs = [blog for blog in blogs if blog.id != blog_id]
+    return {"message": "Blog deleted successfully"}
+
+@app.post("/login", response_model=LoginResponse)
+def login(login_request: LoginRequest):
+    username = login_request.username
+    password = login_request.password
+
+    if username in users and users[username] == password:
+        token = "fake-jwt-token-for-" + username
+        return {"message": "Login successful", "token": token}
     raise HTTPException(status_code=401, detail="Invalid username or password")
 
-@app.post("/api/auth/logout")
-async def logout():
-    return {"message": "User logged out successfully"}
-
-@app.get("/api/inventory", response_model=List[Product])
-async def get_inventory():
-    return products
-
-@app.post("/api/inventory", response_model=Product)
-async def add_new_product(product: Product):
-    product.product_id = str(uuid4())
-    products.append(product.dict())
-    return product
-
-@app.put("/api/inventory", response_model=Product)
-async def update_inventory(product: Product):
-    for p in products:
-        if p["product_id"] == product.product_id:
-            p["quantity"] = product.quantity
-            if p["quantity"] < p["threshold"]:
-                alert = Alert(
-                    alert_id=str(uuid4()),
-                    product_id=p["product_id"],
-                    alert_message=f"Stock for {p['product_name']} is below threshold!"
-                )
-                alerts.append(alert.dict())
-            return product
-    raise HTTPException(status_code=404, detail="Product not found")
-
-@app.delete("/api/inventory/{product_id}")
-async def delete_product(product_id: str):
-    global products
-    products = [p for p in products if p["product_id"] != product_id]
-    return {"message": "Product deleted successfully"}
-
-@app.get("/api/alerts", response_model=List[Alert])
-async def get_alerts():
-    return alerts
-
-@app.delete("/api/alerts/{alert_id}")
-async def dismiss_alert(alert_id: str):
-    global alerts
-    alerts = [a for a in alerts if a["alert_id"] != alert_id]
-    return {"message": "Alert dismissed successfully"}
-
-@app.get("/api/sales/trends", response_model=List[SalesTrend])
-async def get_sales_trends():
-    return sales_trends
+@app.get("/validate-image-url")
+def validate_image_url(url: str = Query(...)):
+    valid_extensions = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"]
+    if not any(url.lower().endswith(ext) for ext in valid_extensions):
+        raise HTTPException(status_code=400, detail="Invalid image URL")
+    return {"message": "Valid image URL"}
