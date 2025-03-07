@@ -1,46 +1,37 @@
 import React, { useState } from "react";
-import { TextField, Button, Container, Typography } from "@mui/material";
-import { login } from "../api";
+import { api } from "../api";
 
-function Login() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+const Login = () => {
+  const [form, setForm] = useState({ username: "", password: "" });
 
-  const handleLogin = async () => {
+  const handleSubmit = async (e) => {
+    e.preventDefault();
     try {
-      const data = await login(username, password);
-      localStorage.setItem("token", data.access_token);
+      const response = await api.login(form);
+      localStorage.setItem("token", response.data.access_token);
       alert("Login successful!");
-    } catch (err) {
-      setError(err.message);
+    } catch (error) {
+      alert("Login failed!");
     }
   };
 
   return (
-    <Container>
-      <Typography variant="h4">Login</Typography>
-      <TextField
-        label="Username"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-        fullWidth
-        margin="normal"
+    <form onSubmit={handleSubmit}>
+      <input
+        type="text"
+        placeholder="Username"
+        value={form.username}
+        onChange={(e) => setForm({ ...form, username: e.target.value })}
       />
-      <TextField
-        label="Password"
+      <input
         type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        fullWidth
-        margin="normal"
+        placeholder="Password"
+        value={form.password}
+        onChange={(e) => setForm({ ...form, password: e.target.value })}
       />
-      {error && <Typography color="error">{error}</Typography>}
-      <Button variant="contained" color="primary" onClick={handleLogin}>
-        Login
-      </Button>
-    </Container>
+      <button type="submit">Login</button>
+    </form>
   );
-}
+};
 
 export default Login;
