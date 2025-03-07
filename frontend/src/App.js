@@ -1,33 +1,44 @@
 import React from "react";
 import { Routes, Route, Link } from "react-router-dom";
-import { AppBar, Toolbar, Typography, Button } from "@mui/material";
-import HomePage from "./pages/HomePage";
-import CreateEditPage from "./pages/CreateEditPage";
-import BlogDetailPage from "./pages/BlogDetailPage";
+import { AppBar, Toolbar, Button, Container } from "@mui/material";
+import Home from "./pages/Home";
+import Users from "./pages/Users";
+import Login from "./components/Auth/Login";
+import Register from "./components/Auth/Register";
+import EntityList from "./components/Entities/EntityList";
 
 const App = () => {
   return (
     <div>
       <AppBar position="static">
         <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            My Blog Platform
-          </Typography>
           <Button color="inherit" component={Link} to="/">
             Home
           </Button>
-          <Button color="inherit" component={Link} to="/create">
-            Create Blog
+          <Button color="inherit" component={Link} to="/users">
+            Users
+          </Button>
+          <Button color="inherit" component={Link} to="/entities">
+            Entities
+          </Button>
+          <Button color="inherit" component={Link} to="/login">
+            Login
+          </Button>
+          <Button color="inherit" component={Link} to="/register">
+            Register
           </Button>
         </Toolbar>
       </AppBar>
 
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/create" element={<CreateEditPage />} />
-        <Route path="/edit/:id" element={<CreateEditPage />} />
-        <Route path="/blogs/:id" element={<BlogDetailPage />} />
-      </Routes>
+      <Container>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/users" element={<Users />} />
+          <Route path="/entities" element={<EntityList />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+        </Routes>
+      </Container>
     </div>
   );
 };
