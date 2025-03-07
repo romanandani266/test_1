@@ -44,8 +44,7 @@ export const updateBlog = async (id, blog) => {
 
 export const deleteBlog = async (id) => {
   try {
-    const response = await axios.delete(`${API_BASE_URL}/blogs/${id}`);
-    return response.data;
+    await axios.delete(`${API_BASE_URL}/blogs/${id}`);
   } catch (error) {
     console.error("Error deleting blog:", error);
     throw error;
