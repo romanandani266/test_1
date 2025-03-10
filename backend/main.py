@@ -1,96 +1,117 @@
-from fastapi import FastAPI, HTTPException, Path, Body
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, HttpUrl, Field
-from typing import List
-from datetime import datetime
+from fastapi import FastAPI, HTTPException, Depends
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from pydantic import BaseModel
+from typing import List, Optional
+from datetime import timedelta, datetime
+import jwt
 
 app = FastAPI()
 
-origins = [
-    "http://localhost:3000",
-    "https://yourfrontend.com"
-]
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
+SECRET_KEY = "your_secret_key"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"]
-)
+mock_inventory = []
+mock_alerts = []
+mock_users = [{"username": "admin", "password": "admin123", "role": "admin"}]
 
-class BlogBase(BaseModel):
-    title: str = Field(..., max_length=255)
-    content: str
-    image_url: HttpUrl
-
-class BlogCreate(BlogBase):
-    pass
-
-class BlogUpdate(BlogBase):
-    pass
-
-class Blog(BlogBase):
-    id: int
-    created_at: datetime
-
-class UserLogin(BaseModel):
+class User(BaseModel):
     username: str
     password: str
+    role: Optional[str] = "user"
 
-blogs = []
-blog_id_counter = 1
-users = {"admin": "password123"}
+class InventoryItem(BaseModel):
+    id: int
+    product_name: str
+    category: str
+    price: float
+    quantity: int
 
-@app.get("/blogs", response_model=List[Blog])
-def get_all_blogs():
-    return blogs
+class Alert(BaseModel):
+    id: int
+    product_id: int
+    threshold: int
+    status: str
 
-@app.get("/blogs/{blog_id}", response_model=Blog)
-def get_blog(blog_id: int = Path(...)):
-    for blog in blogs:
-        if blog.id == blog_id:
-            return blog
-    raise HTTPException(status_code=404, detail="Blog post not found")
+class SalesTrendReport(BaseModel):
+    product_id: int
+    product_name: str
+    sales_trend: str
 
-@app.post("/blogs", response_model=Blog, status_code=201)
-def create_blog(blog: BlogCreate):
-    global blog_id_counter
-    new_blog = Blog(
-        id=blog_id_counter,
-        title=blog.title,
-        content=blog.content,
-        image_url=blog.image_url,
-        created_at=datetime.now()
-    )
-    blogs.append(new_blog)
-    blog_id_counter += 1
-    return new_blog
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
-@app.put("/blogs/{blog_id}", response_model=Blog)
-def update_blog(blog_id: int, updated_blog: BlogUpdate):
-    for index, blog in enumerate(blogs):
-        if blog.id == blog_id:
-            blogs[index] = Blog(
-                id=blog.id,
-                title=updated_blog.title,
-                content=updated_blog.content,
-                image_url=updated_blog.image_url,
-                created_at=blog.created_at
-            )
-            return blogs[index]
-    raise HTTPException(status_code=404, detail="Blog post not found")
+def verify_token(token: str):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token has expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
-@app.delete("/blogs/{blog_id}", response_model=dict)
-def delete_blog(blog_id: int):
-    for index, blog in enumerate(blogs):
-        if blog.id == blog_id:
-            del blogs[index]
-            return {"message": "Blog post deleted successfully"}
-    raise HTTPException(status_code=404, detail="Blog post not found")
+@app.post("/api/auth/login")
+def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = next((u for u in mock_users if u["username"] == form_data.username and u["password"] == form_data.password), None)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    access_token = create_access_token(data={"sub": user["username"], "role": user["role"]}, expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    return {"access_token": access_token, "token_type": "bearer", "role": user["role"]}
 
-@app.post("/login", response_model=dict)
-def login(user: UserLogin = Body(...)):
-    if user.username in users and users[user.username] == user.password:
-        return {"message": "Login successful"}
-    raise HTTPException(status_code=401, detail="Invalid username or password")
+@app.post("/api/auth/logout")
+def logout(token: str = Depends(oauth2_scheme)):
+    return {"message": "Logged out successfully"}
+
+@app.get("/api/inventory", response_model=List[InventoryItem])
+def get_inventory():
+    return mock_inventory
+
+@app.post("/api/inventory", response_model=InventoryItem)
+def add_inventory_item(item: InventoryItem):
+    mock_inventory.append(item)
+    return item
+
+@app.put("/api/inventory/{id}", response_model=InventoryItem)
+def update_inventory_item(id: int, item: InventoryItem):
+    for i, inv_item in enumerate(mock_inventory):
+        if inv_item.id == id:
+            mock_inventory[i] = item
+            return item
+    raise HTTPException(status_code=404, detail="Item not found")
+
+@app.delete("/api/inventory/{id}")
+def delete_inventory_item(id: int):
+    global mock_inventory
+    mock_inventory = [item for item in mock_inventory if item.id != id]
+    return {"message": "Item deleted successfully"}
+
+@app.get("/api/alerts", response_model=List[Alert])
+def get_alerts():
+    return mock_alerts
+
+@app.post("/api/alerts", response_model=Alert)
+def create_alert(alert: Alert):
+    mock_alerts.append(alert)
+    return alert
+
+@app.delete("/api/alerts/{id}")
+def delete_alert(id: int):
+    global mock_alerts
+    mock_alerts = [alert for alert in mock_alerts if alert.id != id]
+    return {"message": "Alert deleted successfully"}
+
+@app.get("/api/sales/trends", response_model=List[SalesTrendReport])
+def get_sales_trends():
+    mock_sales_trends = [
+        {"product_id": 1, "product_name": "Product A", "sales_trend": "Increasing"},
+        {"product_id": 2, "product_name": "Product B", "sales_trend": "Stable"},
+    ]
+    return mock_sales_trends
