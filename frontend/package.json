@@ -1,17 +1,15 @@
 {
-  "name": "my-blog-app",
-  "version": "0.1.0",
+  "name": "retail-inventory-management-system",
+  "version": "1.0.0",
   "private": true,
   "dependencies": {
-    "@emotion/react": "^11.11.0",
-    "@emotion/styled": "^11.11.0",
-    "@mui/material": "^5.15.0",
-    "axios": "^1.5.0",
+    "@mui/material": "^5.13.0",
+    "@emotion/react": "^11.10.0",
+    "@emotion/styled": "^11.10.0",
+    "axios": "^1.4.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.16.0",
-    "react-scripts": "5.0.1",
-    "web-vitals": "^2.1.4"
+    "react-router-dom": "^6.14.0"
   },
   "scripts": {
     "start": "react-scripts start",
