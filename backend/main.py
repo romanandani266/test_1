@@ -1,14 +1,14 @@
-from fastapi import FastAPI, HTTPException, Path, Body
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 from typing import List, Optional
-from datetime import datetime
+from enum import Enum
 
 app = FastAPI()
 
 origins = [
     "http://localhost:3000",
-    "https://yourfrontend.com"
+    "https://yourfrontend.com",
 ]
 
 app.add_middleware(
@@ -16,83 +16,110 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"]
+    allow_headers=["*"],
 )
 
-class Blog(BaseModel):
+class Role(str, Enum):
+    admin = "admin"
+    manager = "manager"
+    viewer = "viewer"
+
+class Product(BaseModel):
     id: int
-    title: str
-    content: str
-    image_url: HttpUrl
-    created_at: datetime
+    name: str
+    category: str
+    stock_level: int
+    restock_threshold: int
+    sales_trend: Optional[List[int]] = None
 
-class BlogCreate(BaseModel):
-    title: str
-    content: str
-    image_url: HttpUrl
-
-class BlogUpdate(BaseModel):
-    title: Optional[str] = None
-    content: Optional[str] = None
-    image_url: Optional[HttpUrl] = None
-
-class UserLogin(BaseModel):
+class User(BaseModel):
     username: str
     password: str
+    role: Role
 
-blogs = []
-blog_id_counter = 1
-users = {"admin": "password123"}
+products = [
+    Product(id=1, name="Pepsi", category="Beverages", stock_level=50, restock_threshold=20, sales_trend=[100, 120, 90]),
+    Product(id=2, name="Lays", category="Snacks", stock_level=30, restock_threshold=10, sales_trend=[80, 70, 60]),
+]
 
-@app.get("/blogs", response_model=List[Blog])
-def get_all_blogs():
-    return blogs
+users = [
+    User(username="admin_user", password="admin123", role=Role.admin),
+    User(username="manager_user", password="manager123", role=Role.manager),
+    User(username="viewer_user", password="viewer123", role=Role.viewer),
+]
 
-@app.get("/blogs/{blog_id}", response_model=Blog)
-def get_blog(blog_id: int = Path(...)):
-    for blog in blogs:
-        if blog.id == blog_id:
-            return blog
-    raise HTTPException(status_code=404, detail="Blog not found")
+def get_current_user(role: Role):
+    def dependency(username: str):
+        user = next((u for u in users if u.username == username), None)
+        if not user or user.role != role:
+            raise HTTPException(status_code=403, detail="Access forbidden")
+        return user
+    return dependency
 
-@app.post("/blogs", response_model=Blog)
-def create_blog(blog_data: BlogCreate = Body(...)):
-    global blog_id_counter
-    new_blog = Blog(
-        id=blog_id_counter,
-        title=blog_data.title,
-        content=blog_data.content,
-        image_url=blog_data.image_url,
-        created_at=datetime.now()
-    )
-    blogs.append(new_blog)
-    blog_id_counter += 1
-    return new_blog
+@app.get("/")
+def root():
+    return {"message": "Welcome to the Retail Inventory Management System API"}
 
-@app.put("/blogs/{blog_id}", response_model=Blog)
-def update_blog(blog_id: int = Path(...), blog_data: BlogUpdate = Body(...)):
-    for blog in blogs:
-        if blog.id == blog_id:
-            if blog_data.title is not None:
-                blog.title = blog_data.title
-            if blog_data.content is not None:
-                blog.content = blog_data.content
-            if blog_data.image_url is not None:
-                blog.image_url = blog_data.image_url
-            return blog
-    raise HTTPException(status_code=404, detail="Blog not found")
+@app.get("/products", response_model=List[Product])
+def get_products():
+    return products
 
-@app.delete("/blogs/{blog_id}")
-def delete_blog(blog_id: int = Path(...)):
-    global blogs
-    for blog in blogs:
-        if blog.id == blog_id:
-            blogs = [b for b in blogs if b.id != blog_id]
-            return {"message": "Blog deleted successfully"}
-    raise HTTPException(status_code=404, detail="Blog not found")
+@app.get("/products/{product_id}", response_model=Product)
+def get_product(product_id: int):
+    product = next((p for p in products if p.id == product_id), None)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return product
+
+@app.post("/products", response_model=Product, dependencies=[Depends(get_current_user(Role.admin))])
+def add_product(product: Product):
+    if any(p.id == product.id for p in products):
+        raise HTTPException(status_code=400, detail="Product with this ID already exists")
+    products.append(product)
+    return product
+
+@app.put("/products/{product_id}", response_model=Product, dependencies=[Depends(get_current_user(Role.manager))])
+def update_product(product_id: int, updated_product: Product):
+    product = next((p for p in products if p.id == product_id), None)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    product.name = updated_product.name
+    product.category = updated_product.category
+    product.stock_level = updated_product.stock_level
+    product.restock_threshold = updated_product.restock_threshold
+    product.sales_trend = updated_product.sales_trend
+    return product
+
+@app.delete("/products/{product_id}", dependencies=[Depends(get_current_user(Role.admin))])
+def delete_product(product_id: int):
+    global products
+    products = [p for p in products if p.id != product_id]
+    return {"message": "Product deleted successfully"}
+
+@app.get("/alerts", response_model=List[str])
+def get_restock_alerts():
+    alerts = []
+    for product in products:
+        if product.stock_level <= product.restock_threshold:
+            alerts.append(f"Product '{product.name}' needs restocking. Current stock: {product.stock_level}")
+    return alerts
+
+@app.get("/sales-trends/{product_id}", response_model=List[int])
+def get_sales_trend(product_id: int):
+    product = next((p for p in products if p.id == product_id), None)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return product.sales_trend
 
 @app.post("/login")
-def login(user: UserLogin = Body(...)):
-    if user.username in users and users[user.username] == user.password:
-        return {"message": "Login successful"}
-    raise HTTPException(status_code=401, detail="Invalid username or password")
+def login(data: dict):
+    username = data.get("username")
+    password = data.get("password")
+    user = next((u for u in users if u.username == username and u.password == password), None)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    return {"message": f"Welcome {user.username}", "role": user.role}
+
+@app.get("/health")
+def health_check():
+    return {"status": "Healthy"}
