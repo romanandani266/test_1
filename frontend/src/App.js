@@ -1,35 +1,32 @@
-import React from "react";
-import { Routes, Route, Link } from "react-router-dom";
-import { CssBaseline, AppBar, Toolbar, Typography, Button } from "@mui/material";
-import HomePage from "./pages/HomePage";
-import CreateEditPage from "./pages/CreateEditPage";
-import BlogDetailPage from "./pages/BlogDetailPage";
+import React from 'react';
+import { Routes, Route, Link } from 'react-router-dom';
+import { Container, AppBar, Toolbar, Button } from '@mui/material';
+import Home from './components/Home';
+import Products from './components/Products';
+import Alerts from './components/Alerts';
+import Login from './components/Login';
+import SalesTrend from './components/SalesTrend';
 
-function App() {
+const App = () => {
   return (
-    <>
-      <CssBaseline />
+    <Container>
       <AppBar position="static">
         <Toolbar>
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            My Blog App
-          </Typography>
-          <Button color="inherit" component={Link} to="/">
-            Home
-          </Button>
-          <Button color="inherit" component={Link} to="/create">
-            Create Blog
-          </Button>
+          <Button color="inherit" component={Link} to="/">Home</Button>
+          <Button color="inherit" component={Link} to="/products">Products</Button>
+          <Button color="inherit" component={Link} to="/alerts">Alerts</Button>
+          <Button color="inherit" component={Link} to="/login">Login</Button>
         </Toolbar>
       </AppBar>
       <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/create" element={<CreateEditPage />} />
-        <Route path="/edit/:id" element={<CreateEditPage />} />
-        <Route path="/blogs/:id" element={<BlogDetailPage />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/products" element={<Products />} />
+        <Route path="/alerts" element={<Alerts />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/sales-trend/:id" element={<SalesTrend />} />
       </Routes>
-    </>
+    </Container>
   );
-}
+};
 
 export default App;
