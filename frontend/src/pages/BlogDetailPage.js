@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
+import { Typography, Box } from "@mui/material";
 import { getBlogById } from "../api";
-import { Typography, Container } from "@mui/material";
 
-function BlogDetailPage() {
+const BlogDetailPage = () => {
   const { id } = useParams();
   const [blog, setBlog] = useState(null);
 
@@ -19,20 +19,20 @@ function BlogDetailPage() {
     fetchBlog();
   }, [id]);
 
-  if (!blog) return <div>Loading...</div>;
+  if (!blog) return <Typography>Loading...</Typography>;
 
   return (
-    <Container style={{ padding: "20px", backgroundImage: `url(https://plus.unsplash.com/premium_photo-1684581214880-2043e5bc8b8b?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D)` }}>
-      <Typography variant="h3" style={{ marginBottom: "20px" }}>
+    <Box padding={2}>
+      <Typography variant="h3" gutterBottom>
         {blog.title}
       </Typography>
-      <img src={blog.image_url} alt={blog.title} style={{ width: "100%", marginBottom: "20px" }} />
-      <Typography variant="body1">{blog.content}</Typography>
-      <Typography variant="caption" display="block" style={{ marginTop: "20px" }}>
-        Created At: {new Date(blog.created_at).toLocaleString()}
+      <img src={blog.image_url} alt={blog.title} style={{ width: "100%", maxHeight: "400px" }} />
+      <Typography variant="body1" paragraph>
+        {blog.content}
       </Typography>
-    </Container>
+      <Typography variant="caption">Created at: {new Date(blog.created_at).toLocaleString()}</Typography>
+    </Box>
   );
-}
+};
 
 export default BlogDetailPage;
