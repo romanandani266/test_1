@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { TextField, Button, Box } from "@mui/material";
+import { TextField, Button } from "@mui/material";
 
 function BlogForm({ blog, onSubmit }) {
   const [formData, setFormData] = useState(blog);
@@ -15,37 +15,37 @@ function BlogForm({ blog, onSubmit }) {
   };
 
   return (
-    <Box component="form" onSubmit={handleSubmit} sx={{ mt: 3 }}>
+    <form onSubmit={handleSubmit} style={{ padding: "20px" }}>
       <TextField
-        fullWidth
         label="Title"
         name="title"
         value={formData.title}
         onChange={handleChange}
+        fullWidth
         margin="normal"
       />
       <TextField
-        fullWidth
         label="Content"
         name="content"
         value={formData.content}
         onChange={handleChange}
+        fullWidth
         margin="normal"
         multiline
         rows={4}
       />
       <TextField
-        fullWidth
         label="Image URL"
         name="image_url"
         value={formData.image_url}
         onChange={handleChange}
+        fullWidth
         margin="normal"
       />
-      <Button type="submit" variant="contained" sx={{ mt: 2 }}>
+      <Button type="submit" variant="contained" color="primary">
         Submit
       </Button>
-    </Box>
+    </form>
   );
 }
 
