@@ -42,6 +42,9 @@ class LoginResponse(BaseModel):
     message: str
     token: Optional[str] = None
 
+class LogoutResponse(BaseModel):
+    message: str
+
 blogs = []
 users = {"admin": "password123"}
 blog_id_counter = 1
@@ -99,3 +102,7 @@ def login(login_request: LoginRequest):
         token = f"fake-token-for-{login_request.username}"
         return LoginResponse(message="Login successful", token=token)
     raise HTTPException(status_code=401, detail="Invalid username or password")
+
+@app.post("/logout", response_model=LogoutResponse)
+def logout():
+    return LogoutResponse(message="Logout successful")
