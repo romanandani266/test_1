@@ -1,35 +1,21 @@
-import React from 'react';
-import { Routes, Route, Link } from 'react-router-dom';
-import { AppBar, Toolbar, Typography, Button } from '@mui/material';
-import HomePage from './pages/HomePage';
-import CreateEditPage from './pages/CreateEditPage';
-import BlogDetailPage from './pages/BlogDetailPage';
+import React from "react";
+import { Routes, Route } from "react-router-dom";
+import Navbar from "./components/Navbar";
+import Home from "./pages/Home";
+import BlogEditor from "./pages/BlogEditor";
+import BlogDetails from "./components/BlogDetails";
 
-function App() {
+const App = () => {
   return (
     <div>
-      <AppBar position="static">
-        <Toolbar>
-          <Typography variant="h6" style={{ flexGrow: 1 }}>
-            My Blog Platform
-          </Typography>
-          <Button color="inherit" component={Link} to="/">
-            Home
-          </Button>
-          <Button color="inherit" component={Link} to="/create">
-            Create Blog
-          </Button>
-        </Toolbar>
-      </AppBar>
-
+      <Navbar />
       <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/create" element={<CreateEditPage />} />
-        <Route path="/edit/:id" element={<CreateEditPage />} />
-        <Route path="/blogs/:id" element={<BlogDetailPage />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/create" element={<BlogEditor />} />
+        <Route path="/blogs/:id" element={<BlogDetails />} />
       </Routes>
     </div>
   );
-}
+};
 
 export default App;
