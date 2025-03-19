@@ -7,7 +7,7 @@ from typing import List, Optional
 app = FastAPI()
 
 origins = [
-    "http://localhost:3000",
+    "http://localhost:3001",#changed the port from 3000 to 3001
     "https://yourfrontend.com"
 ]
 
