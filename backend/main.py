@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional
@@ -20,13 +20,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# In-memory storage for blogs, users, comments, and likes
 blogs = {}
 users = {}
 comments = {}
 likes = {}
 
-# Pydantic models
 class Blog(BaseModel):
     id: str
     user_id: str
@@ -79,15 +77,12 @@ class LikeCreate(BaseModel):
     blog_id: str
     user_id: str
 
-# Helper function to validate image
 def validate_image(file: UploadFile):
     valid_image_types = ["jpeg", "png", "gif"]
     file_type = imghdr.what(file.file)
     if file_type not in valid_image_types:
         raise HTTPException(status_code=400, detail="Invalid image format. Only JPEG, PNG, and GIF are allowed.")
     return file_type
-
-# API Endpoints
 
 @app.post("/users/register", response_model=User)
 def register_user(user: User):
