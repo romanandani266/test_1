@@ -1,25 +1,40 @@
 import React from "react";
-import { Routes, Route } from "react-router-dom";
-import { CssBaseline, ThemeProvider } from "@mui/material";
-import theme from "./theme";
-import Header from "./components/Header";
-import HomePage from "./pages/HomePage";
-import CreateEditPage from "./pages/CreateEditPage";
-import BlogDetailPage from "./pages/BlogDetailPage";
+import { Routes, Route, Link } from "react-router-dom";
+import { AppBar, Toolbar, Button, Container } from "@mui/material";
+import Inventory from "./components/Inventory";
+import Notifications from "./components/Notifications";
+import SalesTrends from "./components/SalesTrends";
+import Login from "./components/Login";
 
-const App = () => {
+function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Header />
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/create" element={<CreateEditPage />} />
-        <Route path="/edit/:id" element={<CreateEditPage />} />
-        <Route path="/blogs/:id" element={<BlogDetailPage />} />
-      </Routes>
-    </ThemeProvider>
+    <div>
+      <AppBar position="static">
+        <Toolbar>
+          <Button color="inherit" component={Link} to="/">
+            Inventory
+          </Button>
+          <Button color="inherit" component={Link} to="/notifications">
+            Notifications
+          </Button>
+          <Button color="inherit" component={Link} to="/sales-trends">
+            Sales Trends
+          </Button>
+          <Button color="inherit" component={Link} to="/login">
+            Login
+          </Button>
+        </Toolbar>
+      </AppBar>
+      <Container>
+        <Routes>
+          <Route path="/" element={<Inventory />} />
+          <Route path="/notifications" element={<Notifications />} />
+          <Route path="/sales-trends" element={<SalesTrends />} />
+          <Route path="/login" element={<Login />} />
+        </Routes>
+      </Container>
+    </div>
   );
-};
+}
 
 export default App;
