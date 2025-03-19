@@ -2,7 +2,7 @@ import axios from "axios";
 
 const API_BASE_URL = "http://localhost:8080";
 
-export const getAllBlogs = async () => {
+export const fetchBlogs = async () => {
   try {
     const response = await axios.get(`${API_BASE_URL}/blogs`);
     return response.data;
@@ -12,7 +12,7 @@ export const getAllBlogs = async () => {
   }
 };
 
-export const getBlogById = async (id) => {
+export const fetchBlogById = async (id) => {
   try {
     const response = await axios.get(`${API_BASE_URL}/blogs/${id}`);
     return response.data;
@@ -22,9 +22,9 @@ export const getBlogById = async (id) => {
   }
 };
 
-export const createBlog = async (blog) => {
+export const createBlog = async (blogData) => {
   try {
-    const response = await axios.post(`${API_BASE_URL}/blogs`, blog);
+    const response = await axios.post(`${API_BASE_URL}/blogs`, blogData);
     return response.data;
   } catch (error) {
     console.error("Error creating blog:", error);
@@ -32,9 +32,9 @@ export const createBlog = async (blog) => {
   }
 };
 
-export const updateBlog = async (id, blog) => {
+export const updateBlog = async (id, blogData) => {
   try {
-    const response = await axios.put(`${API_BASE_URL}/blogs/${id}`, blog);
+    const response = await axios.put(`${API_BASE_URL}/blogs/${id}`, blogData);
     return response.data;
   } catch (error) {
     console.error("Error updating blog:", error);
