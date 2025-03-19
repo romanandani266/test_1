@@ -6,8 +6,8 @@ const Navbar = () => {
   return (
     <AppBar position="static">
       <Toolbar>
-        <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-          My Blog App
+        <Typography variant="h6" sx={{ flexGrow: 1 }}>
+          Modern Blog Platform
         </Typography>
         <Button color="inherit" component={Link} to="/">
           Home
