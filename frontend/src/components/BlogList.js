@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { fetchBlogs } from "../services/api";
+import { fetchBlogs } from "../api";
 import { Link } from "react-router-dom";
 import { Card, CardContent, Typography, Button } from "@mui/material";
 
