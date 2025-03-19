@@ -1,9 +1,8 @@
-from fastapi import FastAPI, HTTPException, Depends, Path, Body
+from fastapi import FastAPI, HTTPException, Path, Body, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, HttpUrl
 from typing import List, Optional
 from datetime import datetime
-from fastapi.security import OAuth2PasswordBearer
 
 app = FastAPI()
 
@@ -68,7 +67,7 @@ def get_blog(blog_id: int = Path(...)):
     return blog
 
 @app.post("/blogs", response_model=Blog)
-def create_blog(blog_data: BlogCreate, current_user: dict = Depends(OAuth2PasswordBearer(tokenUrl="token"))):
+def create_blog(blog_data: BlogCreate):
     global blog_id_counter
     new_blog = {
         "id": blog_id_counter,
@@ -83,7 +82,7 @@ def create_blog(blog_data: BlogCreate, current_user: dict = Depends(OAuth2Passwo
     return new_blog
 
 @app.put("/blogs/{blog_id}", response_model=Blog)
-def update_blog(blog_id: int = Path(...), blog_data: BlogUpdate, current_user: dict = Depends(OAuth2PasswordBearer(tokenUrl="token"))):
+def update_blog(blog_id: int, blog_data: BlogUpdate):
     blog = next((blog for blog in blogs if blog["id"] == blog_id), None)
     if not blog:
         raise HTTPException(status_code=404, detail="Blog post not found")
@@ -97,7 +96,7 @@ def update_blog(blog_id: int = Path(...), blog_data: BlogUpdate, current_user: d
     return blog
 
 @app.delete("/blogs/{blog_id}", status_code=204)
-def delete_blog(blog_id: int = Path(...), current_user: dict = Depends(OAuth2PasswordBearer(tokenUrl="token"))):
+def delete_blog(blog_id: int):
     global blogs
     blog = next((blog for blog in blogs if blog["id"] == blog_id), None)
     if not blog:
