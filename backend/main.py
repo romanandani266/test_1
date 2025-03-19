@@ -1,13 +1,14 @@
-from fastapi import FastAPI, HTTPException, Path, Body
+from fastapi import FastAPI, HTTPException, Depends, Path, Body
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, HttpUrl
-from datetime import datetime
 from typing import List, Optional
+from datetime import datetime
+from fastapi.security import OAuth2PasswordBearer
 
 app = FastAPI()
 
 origins = [
-    "http://localhost:3001",#changed the port from 3000 to 3001
+    "http://localhost:3000",
     "https://yourfrontend.com"
 ]
 
@@ -19,77 +20,87 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+blogs = []
+blog_id_counter = 1
+users = {"test_user": "test_password"}
+
 class Blog(BaseModel):
     id: int
     title: str
     content: str
-    image_url: HttpUrl
+    image_url: Optional[HttpUrl] = None
     created_at: datetime
+    updated_at: datetime
 
 class BlogCreate(BaseModel):
     title: str
     content: str
-    image_url: HttpUrl
+    image_url: Optional[HttpUrl] = None
 
 class BlogUpdate(BaseModel):
     title: Optional[str] = None
     content: Optional[str] = None
     image_url: Optional[HttpUrl] = None
 
-class UserLogin(BaseModel):
+class LoginRequest(BaseModel):
     username: str
     password: str
 
-blogs = []
-blog_id_counter = 1
-users = {"admin": "password123"}
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+
+@app.post("/login", response_model=TokenResponse)
+def login(login_request: LoginRequest):
+    if login_request.username in users and users[login_request.username] == login_request.password:
+        return {"access_token": "valid_token", "token_type": "bearer"}
+    raise HTTPException(status_code=401, detail="Invalid username or password")
 
 @app.get("/blogs", response_model=List[Blog])
-def get_all_blogs():
+def get_blogs():
     return blogs
 
 @app.get("/blogs/{blog_id}", response_model=Blog)
 def get_blog(blog_id: int = Path(...)):
-    for blog in blogs:
-        if blog.id == blog_id:
-            return blog
-    raise HTTPException(status_code=404, detail="Blog not found")
+    blog = next((blog for blog in blogs if blog["id"] == blog_id), None)
+    if not blog:
+        raise HTTPException(status_code=404, detail="Blog post not found")
+    return blog
 
-@app.post("/blogs", response_model=Blog, status_code=201)
-def create_blog(blog_data: BlogCreate = Body(...)):
+@app.post("/blogs", response_model=Blog)
+def create_blog(blog_data: BlogCreate, current_user: dict = Depends(OAuth2PasswordBearer(tokenUrl="token"))):
     global blog_id_counter
-    new_blog = Blog(
-        id=blog_id_counter,
-        title=blog_data.title,
-        content=blog_data.content,
-        image_url=blog_data.image_url,
-        created_at=datetime.now()
-    )
+    new_blog = {
+        "id": blog_id_counter,
+        "title": blog_data.title,
+        "content": blog_data.content,
+        "image_url": blog_data.image_url,
+        "created_at": datetime.utcnow(),
+        "updated_at": datetime.utcnow()
+    }
     blogs.append(new_blog)
     blog_id_counter += 1
     return new_blog
 
 @app.put("/blogs/{blog_id}", response_model=Blog)
-def update_blog(blog_id: int = Path(...), blog_data: BlogUpdate = Body(...)):
-    for blog in blogs:
-        if blog.id == blog_id:
-            if blog_data.title is not None:
-                blog.title = blog_data.title
-            if blog_data.content is not None:
-                blog.content = blog_data.content
-            if blog_data.image_url is not None:
-                blog.image_url = blog_data.image_url
-            return blog
-    raise HTTPException(status_code=404, detail="Blog not found")
+def update_blog(blog_id: int = Path(...), blog_data: BlogUpdate, current_user: dict = Depends(OAuth2PasswordBearer(tokenUrl="token"))):
+    blog = next((blog for blog in blogs if blog["id"] == blog_id), None)
+    if not blog:
+        raise HTTPException(status_code=404, detail="Blog post not found")
+    if blog_data.title:
+        blog["title"] = blog_data.title
+    if blog_data.content:
+        blog["content"] = blog_data.content
+    if blog_data.image_url:
+        blog["image_url"] = blog_data.image_url
+    blog["updated_at"] = datetime.utcnow()
+    return blog
 
 @app.delete("/blogs/{blog_id}", status_code=204)
-def delete_blog(blog_id: int = Path(...)):
+def delete_blog(blog_id: int = Path(...), current_user: dict = Depends(OAuth2PasswordBearer(tokenUrl="token"))):
     global blogs
-    blogs = [blog for blog in blogs if blog.id != blog_id]
-    return {"detail": "Blog deleted successfully"}
-
-@app.post("/login")
-def login(user: UserLogin = Body(...)):
-    if user.username in users and users[user.username] == user.password:
-        return {"message": "Login successful"}
-    raise HTTPException(status_code=401, detail="Invalid username or password")
+    blog = next((blog for blog in blogs if blog["id"] == blog_id), None)
+    if not blog:
+        raise HTTPException(status_code=404, detail="Blog post not found")
+    blogs = [b for b in blogs if b["id"] != blog_id]
+    return
