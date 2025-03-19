@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from "react";
-import { Grid, Card, CardMedia, CardContent, Typography, Button } from "@mui/material";
-import { Link } from "react-router-dom";
-import { getAllBlogs } from "../api";
+import React, { useEffect, useState } from 'react';
+import { getAllBlogs } from '../api';
+import BlogCard from '../components/BlogCard';
+import { Grid, Container } from '@mui/material';
 
-const HomePage = () => {
+function HomePage() {
   const [blogs, setBlogs] = useState([]);
 
   useEffect(() => {
@@ -12,30 +12,23 @@ const HomePage = () => {
         const data = await getAllBlogs();
         setBlogs(data);
       } catch (error) {
-        console.error("Error fetching blogs:", error);
+        console.error('Error fetching blogs:', error);
       }
     };
     fetchBlogs();
   }, []);
 
   return (
-    <Grid container spacing={2} padding={2}>
-      {blogs.map((blog) => (
-        <Grid item xs={12} sm={6} md={4} key={blog.id}>
-          <Card>
-            <CardMedia component="img" height="140" image={blog.image_url} alt={blog.title} />
-            <CardContent>
-              <Typography variant="h6">{blog.title}</Typography>
-              <Typography variant="body2">{blog.content.substring(0, 100)}...</Typography>
-              <Button component={Link} to={`/blogs/${blog.id}`} size="small">
-                Read More
-              </Button>
-            </CardContent>
-          </Card>
-        </Grid>
-      ))}
-    </Grid>
+    <Container>
+      <Grid container spacing={3}>
+        {blogs.map((blog) => (
+          <Grid item xs={12} sm={6} md={4} key={blog.id}>
+            <BlogCard blog={blog} />
+          </Grid>
+        ))}
+      </Grid>
+    </Container>
   );
-};
+}
 
 export default HomePage;
