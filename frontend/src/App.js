@@ -1,24 +1,18 @@
 import React from "react";
 import { Routes, Route } from "react-router-dom";
-import { CssBaseline, ThemeProvider } from "@mui/material";
-import theme from "./theme";
 import Navbar from "./components/Navbar";
-import HomePage from "./pages/HomePage";
-import CreateEditPage from "./pages/CreateEditPage";
-import BlogDetailPage from "./pages/BlogDetailPage";
+import Home from "./pages/Home";
+import CreateBlog from "./pages/CreateBlog";
 
 const App = () => {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
+    <div>
       <Navbar />
       <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/create" element={<CreateEditPage />} />
-        <Route path="/edit/:id" element={<CreateEditPage />} />
-        <Route path="/blogs/:id" element={<BlogDetailPage />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/create" element={<CreateBlog />} />
       </Routes>
-    </ThemeProvider>
+    </div>
   );
 };
 
