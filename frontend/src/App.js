@@ -1,26 +1,41 @@
 import React from 'react';
-import { Routes, Route } from 'react-router-dom';
-import { CssBaseline, ThemeProvider } from '@mui/material';
-import theme from './theme';
-import Navbar from './components/Navbar';
-import Home from './pages/Home';
-import CreateBlog from './pages/CreateBlog';
-import EditBlog from './pages/EditBlog';
-import BlogView from './pages/BlogView';
+import { Routes, Route, Link } from 'react-router-dom';
+import { AppBar, Toolbar, Button, Container } from '@mui/material';
+import Home from './components/Home';
+import Login from './components/Login';
+import Pricing from './components/Pricing';
+import Promotions from './components/Promotions';
+import TradeSpend from './components/TradeSpend';
+import CompetitorTracking from './components/CompetitorTracking';
+import RevenueForecast from './components/RevenueForecast';
 
-const App = () => {
+function App() {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Navbar />
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/create" element={<CreateBlog />} />
-        <Route path="/edit/:id" element={<EditBlog />} />
-        <Route path="/view/:id" element={<BlogView />} />
-      </Routes>
-    </ThemeProvider>
+    <>
+      <AppBar position="static">
+        <Toolbar>
+          <Button color="inherit" component={Link} to="/">Home</Button>
+          <Button color="inherit" component={Link} to="/login">Login</Button>
+          <Button color="inherit" component={Link} to="/pricing">Pricing</Button>
+          <Button color="inherit" component={Link} to="/promotions">Promotions</Button>
+          <Button color="inherit" component={Link} to="/trade-spend">Trade Spend</Button>
+          <Button color="inherit" component={Link} to="/competitor-tracking">Competitor Tracking</Button>
+          <Button color="inherit" component={Link} to="/revenue-forecast">Revenue Forecast</Button>
+        </Toolbar>
+      </AppBar>
+      <Container>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/pricing" element={<Pricing />} />
+          <Route path="/promotions" element={<Promotions />} />
+          <Route path="/trade-spend" element={<TradeSpend />} />
+          <Route path="/competitor-tracking" element={<CompetitorTracking />} />
+          <Route path="/revenue-forecast" element={<RevenueForecast />} />
+        </Routes>
+      </Container>
+    </>
   );
-};
+}
 
 export default App;
