@@ -47,6 +47,13 @@ class LoginResponse(BaseModel):
     message: str
     token: str
 
+class UserCreate(BaseModel):
+    username: str
+    password: str
+
+class UserResponse(BaseModel):
+    username: str
+
 async def validate_image(file: UploadFile):
     allowed_formats = ["image/jpeg", "image/png"]
     max_size = 5 * 1024 * 1024
@@ -119,3 +126,14 @@ async def delete_blog(blog_id: UUID = Path(...)):
         raise HTTPException(status_code=404, detail="Blog not found")
     del blogs[blog_id]
     return {"detail": "Blog deleted successfully"}
+
+@app.post("/users", response_model=UserResponse, status_code=201)
+async def create_user(user: UserCreate = Body(...)):
+    if user.username in users:
+        raise HTTPException(status_code=400, detail="Username already exists")
+    users[user.username] = {"username": user.username, "password": user.password}
+    return {"username": user.username}
+
+@app.get("/users", response_model=List[UserResponse])
+async def get_users():
+    return [{"username": username} for username in users.keys()]
