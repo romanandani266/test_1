@@ -1,24 +1,40 @@
-import React from 'react';
-import { Routes, Route } from 'react-router-dom';
-import { CssBaseline, ThemeProvider } from '@mui/material';
-import theme from './theme';
-import Header from './components/Header';
-import HomePage from './pages/HomePage';
-import BlogDetailPage from './pages/BlogDetailPage';
-import CreateEditBlogPage from './pages/CreateEditBlogPage';
+import React from "react";
+import { Routes, Route, Link } from "react-router-dom";
+import { AppBar, Toolbar, Button, Container } from "@mui/material";
+import Login from "./components/Login";
+import Inventory from "./components/Inventory";
+import Alerts from "./components/Alerts";
+import SalesTrends from "./components/SalesTrends";
 
 const App = () => {
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <Header />
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/blogs/:id" element={<BlogDetailPage />} />
-        <Route path="/create" element={<CreateEditBlogPage />} />
-        <Route path="/edit/:id" element={<CreateEditBlogPage />} />
-      </Routes>
-    </ThemeProvider>
+    <div>
+      <AppBar position="static">
+        <Toolbar>
+          <Button color="inherit" component={Link} to="/">
+            Home
+          </Button>
+          <Button color="inherit" component={Link} to="/inventory">
+            Inventory
+          </Button>
+          <Button color="inherit" component={Link} to="/alerts">
+            Alerts
+          </Button>
+          <Button color="inherit" component={Link} to="/sales-trends">
+            Sales Trends
+          </Button>
+        </Toolbar>
+      </AppBar>
+
+      <Container>
+        <Routes>
+          <Route path="/" element={<Login />} />
+          <Route path="/inventory" element={<Inventory />} />
+          <Route path="/alerts" element={<Alerts />} />
+          <Route path="/sales-trends" element={<SalesTrends />} />
+        </Routes>
+      </Container>
+    </div>
   );
 };
 
