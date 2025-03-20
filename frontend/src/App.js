@@ -1,40 +1,26 @@
-import React from "react";
-import { Routes, Route, Link } from "react-router-dom";
-import { AppBar, Toolbar, Button, Container } from "@mui/material";
-import Inventory from "./components/Inventory";
-import Notifications from "./components/Notifications";
-import SalesTrends from "./components/SalesTrends";
-import Login from "./components/Login";
+import React from 'react';
+import { Routes, Route } from 'react-router-dom';
+import { CssBaseline, ThemeProvider } from '@mui/material';
+import theme from './theme';
+import Navbar from './components/Navbar';
+import Home from './pages/Home';
+import CreateBlog from './pages/CreateBlog';
+import EditBlog from './pages/EditBlog';
+import BlogView from './pages/BlogView';
 
-function App() {
+const App = () => {
   return (
-    <div>
-      <AppBar position="static">
-        <Toolbar>
-          <Button color="inherit" component={Link} to="/">
-            Inventory
-          </Button>
-          <Button color="inherit" component={Link} to="/notifications">
-            Notifications
-          </Button>
-          <Button color="inherit" component={Link} to="/sales-trends">
-            Sales Trends
-          </Button>
-          <Button color="inherit" component={Link} to="/login">
-            Login
-          </Button>
-        </Toolbar>
-      </AppBar>
-      <Container>
-        <Routes>
-          <Route path="/" element={<Inventory />} />
-          <Route path="/notifications" element={<Notifications />} />
-          <Route path="/sales-trends" element={<SalesTrends />} />
-          <Route path="/login" element={<Login />} />
-        </Routes>
-      </Container>
-    </div>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Navbar />
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/create" element={<CreateBlog />} />
+        <Route path="/edit/:id" element={<EditBlog />} />
+        <Route path="/view/:id" element={<BlogView />} />
+      </Routes>
+    </ThemeProvider>
   );
-}
+};
 
 export default App;
