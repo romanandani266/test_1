@@ -1,38 +1,26 @@
-import React, { useState } from "react";
-import { api } from "../api";
-import { TextField, Button, Typography } from "@mui/material";
+import React, { useState } from 'react';
+import { TextField, Button } from '@mui/material';
+import { login } from '../api';
 
 function Login() {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
 
-  const handleLogin = () => {
-    api.login({ username, password })
-      .then((response) => alert(response.data.message))
-      .catch((error) => alert("Login failed: " + error.response.data.detail));
+  const handleLogin = async () => {
+    try {
+      const response = await login(username, password);
+      alert(response.message);
+    } catch (error) {
+      alert('Login failed: ' + error.detail);
+    }
   };
 
   return (
     <div>
-      <Typography variant="h4">Login</Typography>
-      <TextField
-        label="Username"
-        value={username}
-        onChange={(e) => setUsername(e.target.value)}
-        fullWidth
-        margin="normal"
-      />
-      <TextField
-        label="Password"
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        fullWidth
-        margin="normal"
-      />
-      <Button variant="contained" color="primary" onClick={handleLogin}>
-        Login
-      </Button>
+      <h2>Login</h2>
+      <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} fullWidth />
+      <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} fullWidth />
+      <Button variant="contained" color="primary" onClick={handleLogin}>Login</Button>
     </div>
   );
 }
