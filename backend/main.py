@@ -1,14 +1,15 @@
-from fastapi import FastAPI, HTTPException, Path, Query, Body, Depends
+from fastapi import FastAPI, HTTPException, Path, Query, Body, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field
-from typing import Optional, List
-from uuid import uuid4
+from pydantic import BaseModel, HttpUrl, Field
+from typing import List, Optional
+from uuid import uuid4, UUID
+from datetime import datetime
 
 app = FastAPI()
 
 origins = [
     "http://localhost:3000",
-    "https://yourfrontend.com",
+    "https://yourfrontend.com"
 ]
 
 app.add_middleware(
@@ -16,100 +17,105 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*"]
 )
 
-mock_inventory = {}
-mock_users = {
-    "admin": {"username": "admin", "password": "admin123", "role": "admin"},
-    "manager": {"username": "manager", "password": "manager123", "role": "manager"},
-    "viewer": {"username": "viewer", "password": "viewer123", "role": "viewer"},
-}
+blogs = {}
+users = {"admin": {"username": "admin", "password": "admin123"}}
 
-class Product(BaseModel):
-    product_id: str = Field(default_factory=lambda: str(uuid4()))
-    product_name: str
-    description: Optional[str] = None
-    price: Optional[float] = None
-    stock_level: int
-    threshold: int
+class BlogBase(BaseModel):
+    title: str = Field(..., max_length=255)
+    content: str
+    image_url: Optional[HttpUrl]
 
-class InventoryUpdate(BaseModel):
-    product_id: str
-    quantity: int
+class BlogCreate(BlogBase):
+    pass
 
-class NewProduct(BaseModel):
-    product_name: str
-    initial_stock: int
-    description: Optional[str] = None
-    price: Optional[float] = None
+class BlogUpdate(BlogBase):
+    pass
+
+class BlogResponse(BlogBase):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
 
 class LoginRequest(BaseModel):
     username: str
     password: str
 
-@app.post("/api/login")
-async def login(login_request: LoginRequest):
-    user = mock_users.get(login_request.username)
-    if not user or user["password"] != login_request.password:
+class LoginResponse(BaseModel):
+    message: str
+    token: str
+
+async def validate_image(file: UploadFile):
+    allowed_formats = ["image/jpeg", "image/png"]
+    max_size = 5 * 1024 * 1024
+
+    if file.content_type not in allowed_formats:
+        raise HTTPException(status_code=400, detail="Invalid image format.")
+    if len(await file.read()) > max_size:
+        raise HTTPException(status_code=400, detail="Image size exceeds 5MB.")
+    await file.seek(0)
+
+@app.post("/login", response_model=LoginResponse)
+async def login(credentials: LoginRequest = Body(...)):
+    user = users.get(credentials.username)
+    if not user or user["password"] != credentials.password:
         raise HTTPException(status_code=401, detail="Invalid username or password")
-    return {"message": "Login successful", "role": user["role"]}
+    return {"message": "Login successful", "token": "dummy_token"}
 
-@app.get("/api/inventory", response_model=List[Product])
-async def get_current_inventory(product_id: Optional[str] = Query(None)):
-    if product_id:
-        product = mock_inventory.get(product_id)
-        if not product:
-            raise HTTPException(status_code=404, detail="Product not found")
-        return [product]
-    return list(mock_inventory.values())
+@app.get("/blogs", response_model=List[BlogResponse])
+async def get_blogs():
+    return list(blogs.values())
 
-@app.put("/api/inventory")
-async def update_inventory(inventory_update: InventoryUpdate = Body(...)):
-    product = mock_inventory.get(inventory_update.product_id)
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    product.stock_level += inventory_update.quantity
-    return {"message": "Inventory updated successfully", "product": product}
+@app.get("/blogs/{blog_id}", response_model=BlogResponse)
+async def get_blog(blog_id: UUID = Path(...)):
+    blog = blogs.get(blog_id)
+    if not blog:
+        raise HTTPException(status_code=404, detail="Blog not found")
+    return blog
 
-@app.post("/api/inventory")
-async def add_new_product(new_product: NewProduct = Body(...)):
-    product_id = str(uuid4())
-    product = Product(
-        product_id=product_id,
-        product_name=new_product.product_name,
-        description=new_product.description,
-        price=new_product.price,
-        stock_level=new_product.initial_stock,
-        threshold=10
-    )
-    mock_inventory[product_id] = product
-    return {"message": "Product added successfully", "product_id": product_id}
+@app.post("/blogs", response_model=BlogResponse, status_code=201)
+async def create_blog(blog: BlogCreate = Body(...), image: Optional[UploadFile] = File(None)):
+    if image:
+        await validate_image(image)
 
-@app.delete("/api/inventory/{product_id}")
-async def delete_product(product_id: str = Path(...)):
-    product = mock_inventory.pop(product_id, None)
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    return {"message": "Product deleted successfully"}
-
-@app.get("/api/sales-trends")
-async def get_sales_trends():
-    sales_trends = {
-        "top_selling_products": ["Product A", "Product B"],
-        "low_selling_products": ["Product C"],
-        "predicted_demand": {"Product A": 100, "Product B": 50},
+    blog_id = uuid4()
+    now = datetime.utcnow()
+    new_blog = {
+        "id": blog_id,
+        "title": blog.title,
+        "content": blog.content,
+        "image_url": blog.image_url,
+        "created_at": now,
+        "updated_at": now
     }
-    return sales_trends
+    blogs[blog_id] = new_blog
+    return new_blog
 
-@app.get("/api/notifications")
-async def get_notifications():
-    notifications = [
-        {"product_id": "1", "message": "Stock is below threshold for Product A"},
-        {"product_id": "2", "message": "Stock is below threshold for Product B"},
-    ]
-    return notifications
+@app.put("/blogs/{blog_id}", response_model=BlogResponse)
+async def update_blog(blog_id: UUID = Path(...), blog: BlogUpdate = Body(...), image: Optional[UploadFile] = File(None)):
+    existing_blog = blogs.get(blog_id)
+    if not existing_blog:
+        raise HTTPException(status_code=404, detail="Blog not found")
 
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    if image:
+        await validate_image(image)
+
+    now = datetime.utcnow()
+    updated_blog = {
+        **existing_blog,
+        "title": blog.title,
+        "content": blog.content,
+        "image_url": blog.image_url,
+        "updated_at": now
+    }
+    blogs[blog_id] = updated_blog
+    return updated_blog
+
+@app.delete("/blogs/{blog_id}", status_code=204)
+async def delete_blog(blog_id: UUID = Path(...)):
+    if blog_id not in blogs:
+        raise HTTPException(status_code=404, detail="Blog not found")
+    del blogs[blog_id]
+    return {"detail": "Blog deleted successfully"}
