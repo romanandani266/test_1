@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Path, Query, Body, UploadFile, File
+from fastapi import FastAPI, HTTPException, Path, Body, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, HttpUrl, Field
 from typing import List, Optional
