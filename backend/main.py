@@ -1,9 +1,7 @@
-from fastapi import FastAPI, HTTPException, Path, Body, UploadFile, File
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, HttpUrl, Field
-from typing import List, Optional
-from uuid import uuid4, UUID
-from datetime import datetime
+from pydantic import BaseModel
+from typing import List, Dict
 
 app = FastAPI()
 
@@ -20,120 +18,88 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-blogs = {}
-users = {"admin": {"username": "admin", "password": "admin123"}}
-
-class BlogBase(BaseModel):
-    title: str = Field(..., max_length=255)
-    content: str
-    image_url: Optional[HttpUrl]
-
-class BlogCreate(BlogBase):
-    pass
-
-class BlogUpdate(BlogBase):
-    pass
-
-class BlogResponse(BlogBase):
-    id: UUID
-    created_at: datetime
-    updated_at: datetime
-
 class LoginRequest(BaseModel):
     username: str
     password: str
 
-class LoginResponse(BaseModel):
-    message: str
-    token: str
+class PricingRequest(BaseModel):
+    product_id: str
+    market_conditions: Dict[str, float]
+    competitor_prices: Dict[str, float]
 
-class UserCreate(BaseModel):
-    username: str
-    password: str
+class PromotionRequest(BaseModel):
+    promotion_id: str
+    historical_data: List[Dict[str, float]]
 
-class UserResponse(BaseModel):
-    username: str
+class TradeSpendRequest(BaseModel):
+    spend_id: str
+    spend_details: Dict[str, float]
 
-async def validate_image(file: UploadFile):
-    allowed_formats = ["image/jpeg", "image/png"]
-    max_size = 5 * 1024 * 1024
+class CompetitorPriceRequest(BaseModel):
+    competitor_id: str
+    product_id: str
 
-    if file.content_type not in allowed_formats:
-        raise HTTPException(status_code=400, detail="Invalid image format.")
-    if len(await file.read()) > max_size:
-        raise HTTPException(status_code=400, detail="Image size exceeds 5MB.")
-    await file.seek(0)
+class RevenueForecastRequest(BaseModel):
+    scenario_details: Dict[str, float]
 
-@app.post("/login", response_model=LoginResponse)
-async def login(credentials: LoginRequest = Body(...)):
-    user = users.get(credentials.username)
-    if not user or user["password"] != credentials.password:
-        raise HTTPException(status_code=401, detail="Invalid username or password")
-    return {"message": "Login successful", "token": "dummy_token"}
+mock_users = {
+    "admin": "password123",
+    "user1": "userpassword"
+}
 
-@app.get("/blogs", response_model=List[BlogResponse])
-async def get_blogs():
-    return list(blogs.values())
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to the PepsiCo NRM Optimization Platform API"}
 
-@app.get("/blogs/{blog_id}", response_model=BlogResponse)
-async def get_blog(blog_id: UUID = Path(...)):
-    blog = blogs.get(blog_id)
-    if not blog:
-        raise HTTPException(status_code=404, detail="Blog not found")
-    return blog
+@app.post("/login")
+def login(request: LoginRequest):
+    if request.username in mock_users and mock_users[request.username] == request.password:
+        return {"message": "Login successful", "username": request.username}
+    raise HTTPException(status_code=401, detail="Invalid username or password")
 
-@app.post("/blogs", response_model=BlogResponse, status_code=201)
-async def create_blog(blog: BlogCreate = Body(...), image: Optional[UploadFile] = File(None)):
-    if image:
-        await validate_image(image)
-
-    blog_id = uuid4()
-    now = datetime.utcnow()
-    new_blog = {
-        "id": blog_id,
-        "title": blog.title,
-        "content": blog.content,
-        "image_url": blog.image_url,
-        "created_at": now,
-        "updated_at": now
+@app.post("/pricing/optimize")
+def optimize_pricing(request: PricingRequest):
+    optimized_price = sum(request.market_conditions.values()) / len(request.market_conditions) * 1.1
+    return {
+        "product_id": request.product_id,
+        "optimized_price": round(optimized_price, 2),
+        "competitor_prices": request.competitor_prices
     }
-    blogs[blog_id] = new_blog
-    return new_blog
 
-@app.put("/blogs/{blog_id}", response_model=BlogResponse)
-async def update_blog(blog_id: UUID = Path(...), blog: BlogUpdate = Body(...), image: Optional[UploadFile] = File(None)):
-    existing_blog = blogs.get(blog_id)
-    if not existing_blog:
-        raise HTTPException(status_code=404, detail="Blog not found")
-
-    if image:
-        await validate_image(image)
-
-    now = datetime.utcnow()
-    updated_blog = {
-        **existing_blog,
-        "title": blog.title,
-        "content": blog.content,
-        "image_url": blog.image_url,
-        "updated_at": now
+@app.post("/promotions/analyze")
+def analyze_promotion(request: PromotionRequest):
+    roi = sum(data["revenue"] for data in request.historical_data) / sum(data["spend"] for data in request.historical_data)
+    return {
+        "promotion_id": request.promotion_id,
+        "roi": round(roi, 2),
+        "recommendation": "Increase budget" if roi > 1.5 else "Reassess strategy"
     }
-    blogs[blog_id] = updated_blog
-    return updated_blog
 
-@app.delete("/blogs/{blog_id}", status_code=204)
-async def delete_blog(blog_id: UUID = Path(...)):
-    if blog_id not in blogs:
-        raise HTTPException(status_code=404, detail="Blog not found")
-    del blogs[blog_id]
-    return {"detail": "Blog deleted successfully"}
+@app.post("/trade-spend/optimize")
+def optimize_trade_spend(request: TradeSpendRequest):
+    optimized_spend = {key: value * 0.9 for key, value in request.spend_details.items()}
+    return {
+        "spend_id": request.spend_id,
+        "optimized_spend": optimized_spend
+    }
 
-@app.post("/users", response_model=UserResponse, status_code=201)
-async def create_user(user: UserCreate = Body(...)):
-    if user.username in users:
-        raise HTTPException(status_code=400, detail="Username already exists")
-    users[user.username] = {"username": user.username, "password": user.password}
-    return {"username": user.username}
+@app.post("/competitor/track")
+def track_competitor_price(request: CompetitorPriceRequest):
+    competitor_price = 1.05 * 100
+    return {
+        "competitor_id": request.competitor_id,
+        "product_id": request.product_id,
+        "competitor_price": competitor_price
+    }
 
-@app.get("/users", response_model=List[UserResponse])
-async def get_users():
-    return [{"username": username} for username in users.keys()]
+@app.post("/revenue/forecast")
+def forecast_revenue(request: RevenueForecastRequest):
+    forecasted_revenue = sum(request.scenario_details.values()) * 1.2
+    return {
+        "forecasted_revenue": round(forecasted_revenue, 2),
+        "scenario_details": request.scenario_details
+    }
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}
