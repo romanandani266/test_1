@@ -54,6 +54,17 @@ class NotificationRequest(BaseModel):
     message: str
     type: str
 
+class ProductUpdateRequest(BaseModel):
+    product_id: str
+    name: Optional[str]
+    category: Optional[str]
+    stock_level: Optional[int]
+
+class UserRegistrationRequest(BaseModel):
+    username: str
+    password: str
+    role: str
+
 def get_current_user(token: str):
     user = next((user for user in mock_users if user["username"] == token), None)
     if not user:
@@ -97,6 +108,34 @@ def send_notification(notification: NotificationRequest, token: str = Depends(ge
     if token["role"] != "admin":
         raise HTTPException(status_code=403, detail="Access forbidden")
     return {"message": "Notification sent successfully", "notification": notification}
+
+@app.put("/api/inventory/update")
+def update_inventory_item(update_request: ProductUpdateRequest, token: str = Depends(get_current_user)):
+    if token["role"] not in ["admin", "warehouse_manager"]:
+        raise HTTPException(status_code=403, detail="Access forbidden")
+    item = next((item for item in mock_inventory if item["product_id"] == update_request.product_id), None)
+    if not item:
+        raise HTTPException(status_code=404, detail="Product not found")
+    if update_request.name:
+        item["name"] = update_request.name
+    if update_request.category:
+        item["category"] = update_request.category
+    if update_request.stock_level is not None:
+        item["stock_level"] = update_request.stock_level
+    return {"message": "Product updated successfully", "product": item}
+
+@app.post("/api/users/register")
+def register_user(request: UserRegistrationRequest, token: str = Depends(get_current_user)):
+    if token["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Access forbidden")
+    new_user = {
+        "user_id": str(uuid4()),
+        "username": request.username,
+        "password": request.password,
+        "role": request.role,
+    }
+    mock_users.append(new_user)
+    return {"message": "User registered successfully", "user": new_user}
 
 if __name__ == "__main__":
     import uvicorn
