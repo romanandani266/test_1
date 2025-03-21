@@ -1,7 +1,8 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Optional, List
+from uuid import uuid4
 
 app = FastAPI()
 
@@ -19,104 +20,84 @@ app.add_middleware(
 )
 
 mock_inventory = [
-    {"product_id": "1", "product_name": "Pepsi", "stock_level": 50, "warehouse_id": "101"},
-    {"product_id": "2", "product_name": "Lays", "stock_level": 20, "warehouse_id": "102"},
+    {"product_id": str(uuid4()), "name": "Product A", "category": "Category 1", "stock_level": 100, "last_updated": "2023-10-01T12:00:00Z"},
+    {"product_id": str(uuid4()), "name": "Product B", "category": "Category 2", "stock_level": 50, "last_updated": "2023-10-01T12:00:00Z"},
 ]
 
-mock_alerts = [
-    {"alert_id": "1", "product_id": "2", "product_name": "Lays", "current_stock": 20, "threshold": 25},
+mock_users = [
+    {"user_id": str(uuid4()), "username": "admin", "password": "admin123", "role": "admin"},
+    {"user_id": str(uuid4()), "username": "manager", "password": "manager123", "role": "warehouse_manager"},
 ]
 
-mock_sales_trends = {
-    "1": {"daily_sales": [10, 15, 20], "average_sales": 15, "predicted_demand": 18},
-}
+class InventoryItem(BaseModel):
+    product_id: str
+    name: str
+    category: str
+    stock_level: int
+    last_updated: str
+
+class RestockingAlert(BaseModel):
+    product_id: str
+    threshold: int
+
+class SalesTrendRequest(BaseModel):
+    start_date: str
+    end_date: str
+    product_id: Optional[str]
 
 class LoginRequest(BaseModel):
     username: str
     password: str
 
-class LoginResponse(BaseModel):
-    token: str
-    user_role: str
-
-class InventoryItem(BaseModel):
+class NotificationRequest(BaseModel):
     product_id: str
-    product_name: str
-    stock_level: int
-    warehouse_id: str
+    message: str
+    type: str
 
-class UpdateStockRequest(BaseModel):
-    product_id: str
-    warehouse_id: str
-    new_stock_level: int
-
-class Alert(BaseModel):
-    alert_id: str
-    product_id: str
-    product_name: str
-    current_stock: int
-    threshold: int
-
-class AcknowledgeAlertRequest(BaseModel):
-    alert_id: str
-
-class SalesTrendResponse(BaseModel):
-    daily_sales: List[int]
-    average_sales: float
-    predicted_demand: int
-
-@app.post("/api/auth/login", response_model=LoginResponse)
-def login(request: LoginRequest):
-    if request.username == "admin" and request.password == "password":
-        return {"token": "mock-jwt-token", "user_role": "admin"}
-    elif request.username == "manager" and request.password == "password":
-        return {"token": "mock-jwt-token", "user_role": "manager"}
-    elif request.username == "staff" and request.password == "password":
-        return {"token": "mock-jwt-token", "user_role": "staff"}
-    raise HTTPException(status_code=401, detail="Invalid credentials")
-
-@app.post("/api/auth/logout")
-def logout(token: str):
-    return {"message": "Logout successful"}
+def get_current_user(token: str):
+    user = next((user for user in mock_users if user["username"] == token), None)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid authentication credentials")
+    return user
 
 @app.get("/api/inventory", response_model=List[InventoryItem])
-def get_inventory(warehouse_id: Optional[str] = None, product_id: Optional[str] = None):
+def get_inventory(product_id: Optional[str] = None, category: Optional[str] = None, token: str = Depends(get_current_user)):
+    if token["role"] not in ["admin", "warehouse_manager", "retail_partner"]:
+        raise HTTPException(status_code=403, detail="Access forbidden")
     filtered_inventory = mock_inventory
-    if warehouse_id:
-        filtered_inventory = [item for item in filtered_inventory if item["warehouse_id"] == warehouse_id]
     if product_id:
         filtered_inventory = [item for item in filtered_inventory if item["product_id"] == product_id]
+    if category:
+        filtered_inventory = [item for item in filtered_inventory if item["category"] == category]
     if not filtered_inventory:
-        raise HTTPException(status_code=404, detail="No inventory data found")
+        raise HTTPException(status_code=404, detail="No inventory found")
     return filtered_inventory
 
-@app.post("/api/inventory/update")
-def update_stock(request: UpdateStockRequest):
-    for item in mock_inventory:
-        if item["product_id"] == request.product_id and item["warehouse_id"] == request.warehouse_id:
-            item["stock_level"] = request.new_stock_level
-            return {"message": "Stock updated successfully"}
-    raise HTTPException(status_code=404, detail="Product or warehouse not found")
+@app.post("/api/alerts/restocking")
+def create_restocking_alert(alert: RestockingAlert, token: str = Depends(get_current_user)):
+    if token["role"] not in ["admin", "warehouse_manager"]:
+        raise HTTPException(status_code=403, detail="Access forbidden")
+    return {"message": "Restocking alert created/updated successfully", "alert": alert}
 
-@app.get("/api/alerts", response_model=List[Alert])
-def get_alerts(warehouse_id: Optional[str] = None):
-    filtered_alerts = mock_alerts
-    if warehouse_id:
-        filtered_alerts = [alert for alert in filtered_alerts if alert.get("warehouse_id") == warehouse_id]
-    if not filtered_alerts:
-        raise HTTPException(status_code=404, detail="No alerts available")
-    return filtered_alerts
+@app.get("/api/sales/trends")
+def get_sales_trends(request: SalesTrendRequest, token: str = Depends(get_current_user)):
+    if token["role"] not in ["admin", "warehouse_manager", "retail_partner"]:
+        raise HTTPException(status_code=403, detail="Access forbidden")
+    return {"message": "Sales trends fetched successfully", "data": {"start_date": request.start_date, "end_date": request.end_date, "product_id": request.product_id}}
 
-@app.post("/api/alerts/acknowledge")
-def acknowledge_alert(request: AcknowledgeAlertRequest):
-    for alert in mock_alerts:
-        if alert["alert_id"] == request.alert_id:
-            mock_alerts.remove(alert)
-            return {"message": "Alert acknowledged"}
-    raise HTTPException(status_code=404, detail="Alert not found")
+@app.post("/api/auth/login")
+def login(request: LoginRequest):
+    user = next((user for user in mock_users if user["username"] == request.username and user["password"] == request.password), None)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return {"access_token": user["username"], "role": user["role"]}
 
-@app.get("/api/sales/trends", response_model=SalesTrendResponse)
-def get_sales_trends(product_id: str, time_period: str):
-    if product_id in mock_sales_trends:
-        return mock_sales_trends[product_id]
-    raise HTTPException(status_code=404, detail="No sales data available")
+@app.post("/api/notifications")
+def send_notification(notification: NotificationRequest, token: str = Depends(get_current_user)):
+    if token["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Access forbidden")
+    return {"message": "Notification sent successfully", "notification": notification}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
