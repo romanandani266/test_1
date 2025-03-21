@@ -1,43 +1,28 @@
-import React, { useState } from "react";
-import { TextField, Button, Typography } from "@mui/material";
-import { login } from "../api";
+import React, { useState } from 'react';
+import { TextField, Button, Typography } from '@mui/material';
+import { login } from '../api';
 
 const Login = () => {
-  const [credentials, setCredentials] = useState({ username: "", password: "" });
-  const [error, setError] = useState("");
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
 
   const handleLogin = async () => {
     try {
-      const data = await login(credentials);
-      localStorage.setItem("token", data.access_token);
-      alert("Login successful!");
+      const data = await login(username, password);
+      alert(`Login successful! Role: ${data.user_role}`);
     } catch (err) {
-      setError(err.detail || "Login failed");
+      setError(err.detail || 'Login failed');
     }
   };
 
   return (
     <div>
       <Typography variant="h4">Login</Typography>
-      <TextField
-        label="Username"
-        value={credentials.username}
-        onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
-        fullWidth
-        margin="normal"
-      />
-      <TextField
-        label="Password"
-        type="password"
-        value={credentials.password}
-        onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
-        fullWidth
-        margin="normal"
-      />
+      <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} fullWidth />
+      <TextField label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} fullWidth />
+      <Button variant="contained" onClick={handleLogin}>Login</Button>
       {error && <Typography color="error">{error}</Typography>}
-      <Button variant="contained" color="primary" onClick={handleLogin}>
-        Login
-      </Button>
     </div>
   );
 };
