@@ -1,53 +1,57 @@
-import axios from 'axios';
+import axios from "axios";
 
-const API_URL = 'http://localhost:8080';
+const API_BASE_URL = "http://localhost:8080/api";
 
-export const getBlogs = async () => {
+export const login = async (credentials) => {
   try {
-    const response = await axios.get(`${API_URL}/blogs`);
+    const response = await axios.post(`${API_BASE_URL}/auth/login`, credentials);
     return response.data;
   } catch (error) {
-    console.error('Error fetching blogs:', error);
-    throw error;
+    throw error.response.data;
   }
 };
 
-export const getBlogById = async (id) => {
+export const fetchInventory = async (token) => {
   try {
-    const response = await axios.get(`${API_URL}/blogs/${id}`);
+    const response = await axios.get(`${API_BASE_URL}/inventory`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     return response.data;
   } catch (error) {
-    console.error('Error fetching blog:', error);
-    throw error;
+    throw error.response.data;
   }
 };
 
-export const createBlog = async (blog) => {
+export const createRestockingAlert = async (alert, token) => {
   try {
-    const response = await axios.post(`${API_URL}/blogs`, blog);
+    const response = await axios.post(`${API_BASE_URL}/alerts/restocking`, alert, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     return response.data;
   } catch (error) {
-    console.error('Error creating blog:', error);
-    throw error;
+    throw error.response.data;
   }
 };
 
-export const updateBlog = async (id, blog) => {
+export const fetchSalesTrends = async (params, token) => {
   try {
-    const response = await axios.put(`${API_URL}/blogs/${id}`, blog);
+    const response = await axios.get(`${API_BASE_URL}/sales/trends`, {
+      params,
+      headers: { Authorization: `Bearer ${token}` },
+    });
     return response.data;
   } catch (error) {
-    console.error('Error updating blog:', error);
-    throw error;
+    throw error.response.data;
   }
 };
 
-export const deleteBlog = async (id) => {
+export const sendNotification = async (notification, token) => {
   try {
-    const response = await axios.delete(`${API_URL}/blogs/${id}`);
+    const response = await axios.post(`${API_BASE_URL}/notifications`, notification, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
     return response.data;
   } catch (error) {
-    console.error('Error deleting blog:', error);
-    throw error;
+    throw error.response.data;
   }
 };
