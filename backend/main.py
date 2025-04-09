@@ -1,8 +1,8 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
-from uuid import uuid4
+from typing import Optional, List
+from uuid import UUID, uuid4
 
 app = FastAPI()
 
@@ -19,108 +19,96 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-mock_users = {
-    "admin": {"username": "admin", "password": "admin123", "role": "admin"},
-    "manager": {"username": "manager", "password": "manager123", "role": "manager"},
-}
+mock_inventory = [
+    {
+        "inventory_id": str(uuid4()),
+        "product_id": str(uuid4()),
+        "location_id": str(uuid4()),
+        "product_name": "Pepsi",
+        "stock_level": 100,
+        "expiration_date": "2023-12-31",
+    }
+]
 
-mock_inventory = {}
-mock_notifications = []
-mock_sales = []
+mock_alerts = []
+mock_sales_trends = []
+mock_users = [
+    {"user_id": str(uuid4()), "username": "admin", "password": "admin123", "role": "admin"}
+]
 
-class LoginRequest(BaseModel):
+class Inventory(BaseModel):
+    inventory_id: UUID
+    product_id: UUID
+    location_id: UUID
+    product_name: str
+    stock_level: int
+    expiration_date: str
+
+class Alert(BaseModel):
+    product_id: UUID
+    threshold: int
+    location_id: Optional[UUID]
+
+class SalesTrend(BaseModel):
+    start_date: str
+    end_date: str
+    product_category: Optional[str]
+
+class UserLogin(BaseModel):
     username: str
     password: str
 
-class InventoryItem(BaseModel):
-    product_id: str
-    product_name: str
-    stock_level: int
-    threshold: int
+class IntegrationData(BaseModel):
+    system_id: str
+    data_format: str
+    inventory_data: dict
 
-class Notification(BaseModel):
-    notification_id: str
-    product_id: str
-    message: str
-    is_read: bool
+def authenticate_user(username: str, password: str):
+    user = next((u for u in mock_users if u["username"] == username and u["password"] == password), None)
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+    return user
 
-class SalesData(BaseModel):
-    sale_id: str
-    product_id: str
-    quantity_sold: int
-    sale_date: str
-    total_revenue: float
+@app.get("/api/inventory", response_model=List[Inventory])
+async def get_inventory(location_id: Optional[str] = Query(None), product_category: Optional[str] = Query(None)):
+    filtered_inventory = mock_inventory
+    if location_id:
+        filtered_inventory = [item for item in filtered_inventory if item["location_id"] == location_id]
+    if product_category:
+        filtered_inventory = [item for item in filtered_inventory if item["product_name"] == product_category]
+
+    if not filtered_inventory:
+        raise HTTPException(status_code=404, detail="No inventory data found for the specified filters.")
+    return filtered_inventory
+
+@app.post("/api/alerts")
+async def create_or_update_alert(alert: Alert, user: dict = Depends(authenticate_user)):
+    if user["role"] not in ["admin", "manager"]:
+        raise HTTPException(status_code=403, detail="Permission denied.")
+
+    mock_alerts.append(alert.dict())
+    return {"message": "Alert created/updated successfully", "alert": alert}
+
+@app.get("/api/sales-trends")
+async def get_sales_trends(start_date: str, end_date: str, product_category: Optional[str] = Query(None)):
+    sales_trends = [
+        {"date": "2023-10-01", "sales": 100},
+        {"date": "2023-10-02", "sales": 150},
+    ]
+    return {"start_date": start_date, "end_date": end_date, "product_category": product_category, "trends": sales_trends}
 
 @app.post("/api/auth/login")
-async def login(request: LoginRequest):
-    user = mock_users.get(request.username)
-    if not user or user["password"] != request.password:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    return {"token": str(uuid4()), "user_role": user["role"]}
+async def login(user_login: UserLogin):
+    user = authenticate_user(user_login.username, user_login.password)
+    return {"access_token": str(uuid4()), "role": user["role"]}
 
-@app.post("/api/auth/logout")
-async def logout():
-    return {"message": "User logged out successfully"}
+@app.post("/api/integration")
+async def push_inventory_to_third_party(data: IntegrationData, user: dict = Depends(authenticate_user)):
+    if user["role"] != "admin":
+        raise HTTPException(status_code=403, detail="Permission denied.")
 
-@app.get("/api/inventory")
-async def get_inventory(product_id: Optional[str] = None):
-    if product_id:
-        item = mock_inventory.get(product_id)
-        if not item:
-            raise HTTPException(status_code=404, detail="Product not found")
-        return item
-    return list(mock_inventory.values())
+    return {"message": "Data pushed successfully", "integration_status": "success", "data": data}
 
-@app.post("/api/inventory")
-async def add_inventory(item: InventoryItem):
-    if item.product_id in mock_inventory:
-        raise HTTPException(status_code=400, detail="Product already exists")
-    mock_inventory[item.product_id] = item.dict()
-    return {"message": "Product added successfully"}
-
-@app.put("/api/inventory/{product_id}")
-async def update_inventory(product_id: str, stock_level: Optional[int] = None, threshold: Optional[int] = None):
-    item = mock_inventory.get(product_id)
-    if not item:
-        raise HTTPException(status_code=404, detail="Product not found")
-    if stock_level is not None:
-        item["stock_level"] = stock_level
-    if threshold is not None:
-        item["threshold"] = threshold
-    mock_inventory[product_id] = item
-    return {"message": "Product updated successfully"}
-
-@app.delete("/api/inventory/{product_id}")
-async def delete_inventory(product_id: str):
-    if product_id not in mock_inventory:
-        raise HTTPException(status_code=404, detail="Product not found")
-    del mock_inventory[product_id]
-    return {"message": "Product deleted successfully"}
-
-@app.get("/api/notifications")
-async def get_notifications():
-    return mock_notifications
-
-@app.get("/api/sales")
-async def get_sales(start_date: Optional[str] = None, end_date: Optional[str] = None):
-    if start_date and end_date:
-        filtered_sales = [
-            sale for sale in mock_sales
-            if start_date <= sale["sale_date"] <= end_date
-        ]
-        return filtered_sales
-    return mock_sales
-
-@app.middleware("http")
-async def stock_alert_middleware(request, call_next):
-    response = await call_next(request)
-    for product_id, item in mock_inventory.items():
-        if item["stock_level"] < item["threshold"]:
-            notification = {
-                "notification_id": str(uuid4()),
-                "product_id": product_id,
-                "message": f"Stock level for {item['product_name']} is below threshold!",
-                "is_read": False,
-            }
-            mock_notifications.append(notification)
-    return response
+@app.get("/")
+async def root():
+    return {"message": "Welcome to the Retail Inventory Management System API"}
