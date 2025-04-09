@@ -1,36 +1,40 @@
 import React, { useState } from "react";
-import { fetchSalesTrends } from "../api";
-import { TextField, Button, Typography } from "@mui/material";
+import { api } from "../api";
 
 const SalesTrends = () => {
-  const [productId, setProductId] = useState("");
-  const [timePeriod, setTimePeriod] = useState("");
-  const [salesData, setSalesData] = useState(null);
+  const [trends, setTrends] = useState([]);
+  const [filters, setFilters] = useState({ start_date: "", end_date: "" });
 
-  const handleFetchTrends = async () => {
+  const fetchTrends = async () => {
     try {
-      const data = await fetchSalesTrends(productId, timePeriod);
-      setSalesData(data);
+      const data = await api.getSalesTrends(filters);
+      setTrends(data.trends);
     } catch (err) {
-      console.error(err);
+      console.error("Error fetching sales trends:", err);
     }
   };
 
   return (
     <div>
-      <Typography variant="h4">Sales Trends</Typography>
-      <TextField label="Product ID" value={productId} onChange={(e) => setProductId(e.target.value)} fullWidth />
-      <TextField label="Time Period" value={timePeriod} onChange={(e) => setTimePeriod(e.target.value)} fullWidth />
-      <Button variant="contained" onClick={handleFetchTrends}>
-        Fetch Trends
-      </Button>
-      {salesData && (
-        <div>
-          <Typography>Daily Sales: {salesData.daily_sales.join(", ")}</Typography>
-          <Typography>Average Sales: {salesData.average_sales}</Typography>
-          <Typography>Predicted Demand: {salesData.predicted_demand}</Typography>
-        </div>
-      )}
+      <h2>Sales Trends</h2>
+      <input
+        type="date"
+        value={filters.start_date}
+        onChange={(e) => setFilters({ ...filters, start_date: e.target.value })}
+      />
+      <input
+        type="date"
+        value={filters.end_date}
+        onChange={(e) => setFilters({ ...filters, end_date: e.target.value })}
+      />
+      <button onClick={fetchTrends}>Fetch Trends</button>
+      <ul>
+        {trends.map((trend, index) => (
+          <li key={index}>
+            {trend.date}: {trend.sales}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 };
