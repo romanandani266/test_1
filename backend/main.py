@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, List
@@ -20,95 +20,99 @@ app.add_middleware(
 )
 
 mock_inventory = [
-    {
-        "inventory_id": str(uuid4()),
-        "product_id": str(uuid4()),
-        "location_id": str(uuid4()),
-        "product_name": "Pepsi",
-        "stock_level": 100,
-        "expiration_date": "2023-12-31",
-    }
+    {"location_id": "loc1", "product_id": "prod1", "stock_level": 50, "threshold": 20},
+    {"location_id": "loc2", "product_id": "prod2", "stock_level": 10, "threshold": 15},
 ]
 
-mock_alerts = []
-mock_sales_trends = []
+mock_sales = [
+    {"product_id": "prod1", "location_id": "loc1", "quantity_sold": 100, "sale_date": "2023-10-01"},
+    {"product_id": "prod2", "location_id": "loc2", "quantity_sold": 50, "sale_date": "2023-10-02"},
+]
+
+mock_alerts = [
+    {"alert_id": str(uuid4()), "product_id": "prod2", "location_id": "loc2", "alert_date": "2023-10-03", "status": "pending"},
+]
+
 mock_users = [
-    {"user_id": str(uuid4()), "username": "admin", "password": "admin123", "role": "admin"}
+    {"user_id": str(uuid4()), "username": "admin", "password": "admin123", "role": "admin"},
+    {"user_id": str(uuid4()), "username": "manager", "password": "manager123", "role": "manager"},
 ]
 
 class Inventory(BaseModel):
-    inventory_id: UUID
-    product_id: UUID
-    location_id: UUID
-    product_name: str
+    location_id: str
+    product_id: str
     stock_level: int
-    expiration_date: str
-
-class Alert(BaseModel):
-    product_id: UUID
     threshold: int
-    location_id: Optional[UUID]
+
+class InventoryUpdate(BaseModel):
+    location_id: str
+    product_id: str
+    new_stock_level: int
+
+class RestockingAlert(BaseModel):
+    product_id: str
+    location_id: str
+    contact_details: str
 
 class SalesTrend(BaseModel):
-    start_date: str
-    end_date: str
-    product_category: Optional[str]
+    product_id: Optional[str]
+    date_range: Optional[str]
 
 class UserLogin(BaseModel):
     username: str
     password: str
 
-class IntegrationData(BaseModel):
-    system_id: str
-    data_format: str
-    inventory_data: dict
-
-def authenticate_user(username: str, password: str):
-    user = next((u for u in mock_users if u["username"] == username and u["password"] == password), None)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
-    return user
+@app.post("/api/auth/login")
+def login(user: UserLogin):
+    for mock_user in mock_users:
+        if mock_user["username"] == user.username and mock_user["password"] == user.password:
+            return {"message": "Login successful", "user_id": mock_user["user_id"], "role": mock_user["role"]}
+    raise HTTPException(status_code=401, detail="Invalid username or password.")
 
 @app.get("/api/inventory", response_model=List[Inventory])
-async def get_inventory(location_id: Optional[str] = Query(None), product_category: Optional[str] = Query(None)):
+def get_inventory(location_id: Optional[str] = None, product_id: Optional[str] = None):
     filtered_inventory = mock_inventory
     if location_id:
         filtered_inventory = [item for item in filtered_inventory if item["location_id"] == location_id]
-    if product_category:
-        filtered_inventory = [item for item in filtered_inventory if item["product_name"] == product_category]
-
+    if product_id:
+        filtered_inventory = [item for item in filtered_inventory if item["product_id"] == product_id]
     if not filtered_inventory:
-        raise HTTPException(status_code=404, detail="No inventory data found for the specified filters.")
+        raise HTTPException(status_code=404, detail="Inventory not found.")
     return filtered_inventory
 
-@app.post("/api/alerts")
-async def create_or_update_alert(alert: Alert, user: dict = Depends(authenticate_user)):
-    if user["role"] not in ["admin", "manager"]:
-        raise HTTPException(status_code=403, detail="Permission denied.")
+@app.post("/api/inventory/update")
+def update_inventory(update: InventoryUpdate):
+    for item in mock_inventory:
+        if item["location_id"] == update.location_id and item["product_id"] == update.product_id:
+            item["stock_level"] = update.new_stock_level
+            return {"message": "Inventory updated successfully.", "updated_inventory": item}
+    raise HTTPException(status_code=404, detail="Inventory record not found.")
 
-    mock_alerts.append(alert.dict())
-    return {"message": "Alert created/updated successfully", "alert": alert}
-
-@app.get("/api/sales-trends")
-async def get_sales_trends(start_date: str, end_date: str, product_category: Optional[str] = Query(None)):
-    sales_trends = [
-        {"date": "2023-10-01", "sales": 100},
-        {"date": "2023-10-02", "sales": 150},
+@app.get("/api/alerts/restocking")
+def get_restocking_alerts(location_id: Optional[str] = None):
+    alerts = [
+        {"product_id": item["product_id"], "location_id": item["location_id"]}
+        for item in mock_inventory if item["stock_level"] < item["threshold"]
     ]
-    return {"start_date": start_date, "end_date": end_date, "product_category": product_category, "trends": sales_trends}
+    if location_id:
+        alerts = [alert for alert in alerts if alert["location_id"] == location_id]
+    if not alerts:
+        raise HTTPException(status_code=404, detail="No restocking alerts found.")
+    return alerts
 
-@app.post("/api/auth/login")
-async def login(user_login: UserLogin):
-    user = authenticate_user(user_login.username, user_login.password)
-    return {"access_token": str(uuid4()), "role": user["role"]}
+@app.post("/api/alerts/notify")
+def send_restocking_notification(alert: RestockingAlert):
+    return {"message": "Restocking notification sent successfully.", "alert_details": alert}
 
-@app.post("/api/integration")
-async def push_inventory_to_third_party(data: IntegrationData, user: dict = Depends(authenticate_user)):
-    if user["role"] != "admin":
-        raise HTTPException(status_code=403, detail="Permission denied.")
-
-    return {"message": "Data pushed successfully", "integration_status": "success", "data": data}
+@app.get("/api/sales/trends")
+def get_sales_trends(product_id: Optional[str] = None, date_range: Optional[str] = None):
+    filtered_sales = mock_sales
+    if product_id:
+        filtered_sales = [sale for sale in filtered_sales if sale["product_id"] == product_id]
+    if not filtered_sales:
+        raise HTTPException(status_code=404, detail="No sales data found.")
+    return filtered_sales
 
 @app.get("/")
-async def root():
-    return {"message": "Welcome to the Retail Inventory Management System API"}
+def root():
+    return {"message": "Welcome to the Retail Inventory Management System API!"}
