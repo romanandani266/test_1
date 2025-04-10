@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from "react";
-import { api } from "../api";
+import { getInventory } from "../api";
+import { Typography, List, ListItem } from "@mui/material";
 
 const Inventory = () => {
   const [inventory, setInventory] = useState([]);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     const fetchInventory = async () => {
       try {
-        const data = await api.getInventory();
+        const data = await getInventory();
         setInventory(data);
       } catch (err) {
-        setError(err.message);
+        setError(err.detail || "Error fetching inventory");
       }
     };
     fetchInventory();
@@ -19,15 +20,15 @@ const Inventory = () => {
 
   return (
     <div>
-      <h2>Inventory</h2>
-      {error && <p>Error: {error}</p>}
-      <ul>
+      <Typography variant="h4">Inventory</Typography>
+      {error && <Typography color="error">{error}</Typography>}
+      <List>
         {inventory.map((item) => (
-          <li key={item.inventory_id}>
-            {item.product_name} - {item.stock_level}
-          </li>
+          <ListItem key={item.inventory_id}>
+            {item.product_id} - {item.stock_level}
+          </ListItem>
         ))}
-      </ul>
+      </List>
     </div>
   );
 };
