@@ -1,39 +1,34 @@
-import React, { useState } from "react";
-import { api } from "../api";
+import React, { useState, useEffect } from "react";
+import { getAlerts } from "../api";
+import { Typography, List, ListItem } from "@mui/material";
 
 const Alerts = () => {
-  const [alertData, setAlertData] = useState({ product_id: "", threshold: 0 });
-  const [message, setMessage] = useState("");
+  const [alerts, setAlerts] = useState([]);
+  const [error, setError] = useState("");
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      const response = await api.createAlert(alertData, "your-token-here");
-      setMessage(response.message);
-    } catch (err) {
-      setMessage("Error creating alert.");
-    }
-  };
+  useEffect(() => {
+    const fetchAlerts = async () => {
+      try {
+        const data = await getAlerts();
+        setAlerts(data);
+      } catch (err) {
+        setError(err.detail || "Error fetching alerts");
+      }
+    };
+    fetchAlerts();
+  }, []);
 
   return (
     <div>
-      <h2>Create Alert</h2>
-      <form onSubmit={handleSubmit}>
-        <input
-          type="text"
-          placeholder="Product ID"
-          value={alertData.product_id}
-          onChange={(e) => setAlertData({ ...alertData, product_id: e.target.value })}
-        />
-        <input
-          type="number"
-          placeholder="Threshold"
-          value={alertData.threshold}
-          onChange={(e) => setAlertData({ ...alertData, threshold: e.target.value })}
-        />
-        <button type="submit">Create Alert</button>
-      </form>
-      {message && <p>{message}</p>}
+      <Typography variant="h4">Alerts</Typography>
+      {error && <Typography color="error">{error}</Typography>}
+      <List>
+        {alerts.map((alert) => (
+          <ListItem key={alert.alert_id}>
+            {alert.product_id} - Threshold: {alert.threshold}
+          </ListItem>
+        ))}
+      </List>
     </div>
   );
 };
