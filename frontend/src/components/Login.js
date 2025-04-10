@@ -1,39 +1,41 @@
 import React, { useState } from "react";
-import { api } from "../api";
+import { login } from "../api";
+import { Typography, TextField, Button } from "@mui/material";
 
 const Login = () => {
-  const [credentials, setCredentials] = useState({ username: "", password: "" });
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  const handleLogin = async () => {
     try {
-      const response = await api.login(credentials);
-      setMessage(`Login successful! Role: ${response.role}`);
+      const data = await login(username, password);
+      setMessage(data.message);
+      setError("");
     } catch (err) {
-      setMessage("Login failed.");
+      setError(err.detail || "Login failed");
+      setMessage("");
     }
   };
 
   return (
     <div>
-      <h2>Login</h2>
-      <form onSubmit={handleLogin}>
-        <input
-          type="text"
-          placeholder="Username"
-          value={credentials.username}
-          onChange={(e) => setCredentials({ ...credentials, username: e.target.value })}
-        />
-        <input
-          type="password"
-          placeholder="Password"
-          value={credentials.password}
-          onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
-        />
-        <button type="submit">Login</button>
-      </form>
-      {message && <p>{message}</p>}
+      <Typography variant="h4">Login</Typography>
+      <TextField
+        label="Username"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+      />
+      <TextField
+        label="Password"
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+      />
+      <Button onClick={handleLogin}>Login</Button>
+      {message && <Typography color="primary">{message}</Typography>}
+      {error && <Typography color="error">{error}</Typography>}
     </div>
   );
 };
