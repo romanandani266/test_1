@@ -1,40 +1,48 @@
 import React, { useState } from "react";
-import { api } from "../api";
+import { getSalesTrends } from "../api";
+import { Typography, Button, TextField } from "@mui/material";
 
 const SalesTrends = () => {
-  const [trends, setTrends] = useState([]);
-  const [filters, setFilters] = useState({ start_date: "", end_date: "" });
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [trends, setTrends] = useState(null);
+  const [error, setError] = useState("");
 
   const fetchTrends = async () => {
     try {
-      const data = await api.getSalesTrends(filters);
-      setTrends(data.trends);
+      const data = await getSalesTrends({ start_date: startDate, end_date: endDate });
+      setTrends(data);
     } catch (err) {
-      console.error("Error fetching sales trends:", err);
+      setError(err.detail || "Error fetching sales trends");
     }
   };
 
   return (
     <div>
-      <h2>Sales Trends</h2>
-      <input
+      <Typography variant="h4">Sales Trends</Typography>
+      <TextField
+        label="Start Date"
         type="date"
-        value={filters.start_date}
-        onChange={(e) => setFilters({ ...filters, start_date: e.target.value })}
+        value={startDate}
+        onChange={(e) => setStartDate(e.target.value)}
+        InputLabelProps={{ shrink: true }}
       />
-      <input
+      <TextField
+        label="End Date"
         type="date"
-        value={filters.end_date}
-        onChange={(e) => setFilters({ ...filters, end_date: e.target.value })}
+        value={endDate}
+        onChange={(e) => setEndDate(e.target.value)}
+        InputLabelProps={{ shrink: true }}
       />
-      <button onClick={fetchTrends}>Fetch Trends</button>
-      <ul>
-        {trends.map((trend, index) => (
-          <li key={index}>
-            {trend.date}: {trend.sales}
-          </li>
-        ))}
-      </ul>
+      <Button onClick={fetchTrends}>Fetch Trends</Button>
+      {error && <Typography color="error">{error}</Typography>}
+      {trends && (
+        <div>
+          <Typography>Total Sales: {trends.total_sales}</Typography>
+          <Typography>Average Sales: {trends.average_sales}</Typography>
+          <Typography>Peak Sales Period: {trends.peak_sales_period}</Typography>
+        </div>
+      )}
     </div>
   );
 };
